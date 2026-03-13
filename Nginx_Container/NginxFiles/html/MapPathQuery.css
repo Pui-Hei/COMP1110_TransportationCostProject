@@ -784,6 +784,21 @@ textarea {
     line-height: 1.4;
 }
 
+/* Animated Path Visualization */
+.animated-path {
+    stroke-dasharray: 15 15 !important;
+    animation: path-march 1s linear infinite;
+}
+
+@keyframes path-march {
+    from {
+        stroke-dashoffset: 30;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
 /* Responsive */
 
 @media (max-width: 900px) {

@@ -24,6 +24,7 @@ const state = {
     landmarkLayer: null,
     busLayer: null,
     trainLayer: null,
+    pathLayer: null, // New layer for the best path
     activeMapId: null,
     activeMapName: "",
     renderedLandmarkMarkers: [],
@@ -136,15 +137,21 @@ function initLeaflet() {
     state.leafletMap = L.map("queryMap", {
         attributionControl: false,
         zoomControl: true,
-        preferCanvas: true,
+        // Set preferCanvas to false so we can use CSS animations on SVG paths
+        preferCanvas: false, 
         zoomSnap: 0.25
     });
 
     state.leafletMap.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
+    // Create a custom pane for the path to float above static lines but below markers
+    state.leafletMap.createPane('pathPane');
+    state.leafletMap.getPane('pathPane').style.zIndex = 550;
+
     state.busLayer = L.layerGroup().addTo(state.leafletMap);
     state.trainLayer = L.layerGroup().addTo(state.leafletMap);
     state.landmarkLayer = L.layerGroup().addTo(state.leafletMap);
+    state.pathLayer = L.layerGroup().addTo(state.leafletMap);
 }
 
 function loadSelectedMapFromUrl() {
@@ -376,17 +383,10 @@ function fitMapToBounds(boundsPoints) {
 }
 
 function clearMapLayers() {
-    if (state.landmarkLayer) {
-        state.landmarkLayer.clearLayers();
-    }
-
-    if (state.busLayer) {
-        state.busLayer.clearLayers();
-    }
-
-    if (state.trainLayer) {
-        state.trainLayer.clearLayers();
-    }
+    if (state.landmarkLayer) state.landmarkLayer.clearLayers();
+    if (state.busLayer) state.busLayer.clearLayers();
+    if (state.trainLayer) state.trainLayer.clearLayers();
+    if (state.pathLayer) state.pathLayer.clearLayers();
 
     state.renderedLandmarkMarkers = [];
 }
@@ -615,6 +615,7 @@ function clearSelections() {
     updateSelectionDisplays();
     updateLandmarkSelectionStyles();
     updateQueryControlsState();
+    if (state.pathLayer) state.pathLayer.clearLayers();
 }
 
 function getSelectedTransports() {
@@ -688,6 +689,9 @@ async function submitBestPathQuery() {
     setStatus("Querying path...", "loading");
     setQueryResultStatus("Loading...", "loading");
     elements.queryResultOutput.textContent = `POST ${BEST_PATH_ENDPOINT}\n\n${JSON.stringify(payload, null, 2)}`;
+    
+    // Clear the previous path before fetching the new one
+    if (state.pathLayer) state.pathLayer.clearLayers();
 
     try {
         const result = await postJson(BEST_PATH_ENDPOINT, payload);
@@ -697,6 +701,11 @@ async function submitBestPathQuery() {
         if (result.success) {
             setStatus("Query complete", "ready");
             setQueryResultStatus("Success", "ready");
+            
+            // Render the path visually on the map
+            if (result.data && Array.isArray(result.data.path)) {
+                drawPathOnMap(result.data.path);
+            }
         } else {
             setStatus("Query failed", "error");
             setQueryResultStatus("Failed", "error");
@@ -712,9 +721,80 @@ async function submitBestPathQuery() {
     }
 }
 
+function drawPathOnMap(pathSegments) {
+    if (state.pathLayer) state.pathLayer.clearLayers();
+    if (!pathSegments || !pathSegments.length) return;
+
+    const pathBounds = [];
+
+    pathSegments.forEach((segment, index) => {
+        // Find the coordinates for the start and end landmarks of this segment
+        const startObj = state.renderedLandmarkMarkers.find(m => m.landmark.landmark_name === segment.start_point);
+        const endObj = state.renderedLandmarkMarkers.find(m => m.landmark.landmark_name === segment.end_point);
+
+        if (!startObj || !endObj) return;
+
+        const startLatLng = [Number(startObj.landmark.latitude), Number(startObj.landmark.longitude)];
+        const endLatLng = [Number(endObj.landmark.latitude), Number(endObj.landmark.longitude)];
+
+        pathBounds.push(startLatLng, endLatLng);
+
+        // Determine line color based on transport method
+        let color = "#16a34a"; // Default to foot (green)
+        const method = (segment.transportation_method || "").toLowerCase();
+        
+        if (method.includes("train")) color = "#e11d48"; // Rose
+        else if (method.includes("bus")) color = "#2563eb"; // Blue
+        else if (method.includes("taxi")) color = "#d97706"; // Amber
+
+        // Draw a thick white background line to create a "glow" and ensure visibility over other map lines
+        L.polyline([startLatLng, endLatLng], {
+            color: '#ffffff',
+            weight: 8,
+            opacity: 0.9,
+            pane: 'pathPane',
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(state.pathLayer);
+
+        // Draw the main animated dashed line
+        const polyline = L.polyline([startLatLng, endLatLng], {
+            color: color,
+            weight: 5,
+            opacity: 1,
+            pane: 'pathPane',
+            className: 'animated-path', // Hooks into the CSS animation
+            lineCap: 'round',
+            lineJoin: 'round'
+        });
+
+        const tooltipHtml = `
+            <div class="tooltip-title">Step ${index + 1}: ${escapeHtml(segment.transportation_method)}</div>
+            <div class="tooltip-subtitle">${escapeHtml(segment.start_point)} ➔ ${escapeHtml(segment.end_point)}</div>
+            <div class="tooltip-subtitle">Time: ${segment.time_minutes} min</div>
+        `;
+
+        polyline.bindTooltip(tooltipHtml, {
+            sticky: true,
+            className: 'route-tooltip'
+        });
+
+        polyline.addTo(state.pathLayer);
+    });
+
+    // Zoom and pan the map to comfortably fit the calculated path
+    if (pathBounds.length > 0) {
+        state.leafletMap.fitBounds(L.latLngBounds(pathBounds), {
+            padding: [50, 50],
+            maxZoom: 13
+        });
+    }
+}
+
 function resetQueryResult() {
     setQueryResultStatus("Waiting...", "idle");
     elements.queryResultOutput.textContent = "No path query has been sent yet.";
+    if (state.pathLayer) state.pathLayer.clearLayers();
 }
 
 function setQueryResultError(message) {

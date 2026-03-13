@@ -280,32 +280,29 @@ def get_best_path(map_id, start_lm, end_lm, transports_available, element_to_opt
 
     # 4. Format the final output path
     formatted_path = []
+    total_transfers = 0
+    
     if best_path:
-        curr_segment = best_path[0].copy()
-        curr_segment["start_point"] = next(lm["landmark_name"] for lm in landmarks if lm["landmark_id"] == curr_segment["from"])
+        # Create a quick lookup for landmark names to avoid O(N) search every time
+        lm_name_map = {lm["landmark_id"]: lm["landmark_name"] for lm in landmarks}
         
-        for i in range(1, len(best_path)):
-            nxt = best_path[i]
+        for i, segment in enumerate(best_path):
+            seg_data = {
+                "start_point": lm_name_map[segment["from"]],
+                "end_point": lm_name_map[segment["to"]],
+                "transport": segment["transport"],
+                "line_code": segment["line_code"],
+                "time_min": segment["time_min"]
+            }
+            formatted_path.append(_format_segment_output(seg_data))
             
-            if nxt["transport"] == curr_segment["transport"] and nxt["line_code"] == curr_segment["line_code"]:
-                # Extend the current segment
-                curr_segment["to"] = nxt["to"]
-                curr_segment["time_min"] += nxt["time_min"]
-            else:
-                # Close the current segment and append it
-                curr_segment["end_point"] = next(lm["landmark_name"] for lm in landmarks if lm["landmark_id"] == curr_segment["to"])
-                formatted_path.append(_format_segment_output(curr_segment))
-                
-                # Start a new segment
-                curr_segment = nxt.copy()
-                curr_segment["start_point"] = next(lm["landmark_name"] for lm in landmarks if lm["landmark_id"] == curr_segment["from"])
-                
-        # Close the final segment
-        curr_segment["end_point"] = next(lm["landmark_name"] for lm in landmarks if lm["landmark_id"] == curr_segment["to"])
-        formatted_path.append(_format_segment_output(curr_segment))
+            # Count transfers: increment if the transport method or line code changes
+            if i > 0:
+                prev_seg = best_path[i - 1]
+                if prev_seg["transport"] != segment["transport"] or prev_seg["line_code"] != segment["line_code"]:
+                    total_transfers += 1
 
     total_time = sum(seg["time_min"] for seg in best_path)
-    total_transfers = len(formatted_path) - 1 if formatted_path else 0
 
     return {
         "success": True,
