@@ -29,6 +29,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (response.ok && data.success) {
                 resultBox.className = 'result success';
                 resultBox.textContent = JSON.stringify(data, null, 2);
+
+                setTimeout(() => {
+                    window.location.href = 'MapPreviewer.html';
+                }, 500);
             } else {
                 resultBox.className = 'result error';
                 resultBox.textContent = JSON.stringify(data, null, 2);

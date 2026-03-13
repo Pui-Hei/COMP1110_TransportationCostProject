@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Map Previewer</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link rel="stylesheet" href="MapPreviewer.css" />
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="sidebar-title">Maps</h1>
+                <p class="sidebar-subtitle">
+                    Hover a map to preview it.
+                </p>
+
+                <div style="margin-top: 12px;">
+                    <button
+                        type="button"
+                        onclick="window.location.href='CSVImporter.html'"
+                    >
+                        Import New Map
+                    </button>
+                </div>
+            </div>
+
+            <div id="mapsList" class="maps-list" aria-live="polite">
+                <div class="list-state">Loading maps...</div>
+            </div>
+        </aside>
+
+        <main class="preview-panel">
+            <header class="preview-header">
+                <div class="preview-header-text">
+                    <p class="eyebrow">Map Preview</p>
+                    <h2 id="previewTitle" class="preview-title">No map selected</h2>
+                    <p id="previewSubtitle" class="preview-subtitle">
+                        Move your pointer over a map on the left to load its preview.
+                    </p>
+                </div>
+
+                <div id="statusBadge" class="status-badge idle">Idle</div>
+            </header>
+
+            <section class="summary-grid">
+                <article class="summary-card">
+                    <span class="summary-label">Landmarks</span>
+                    <strong id="landmarkCount" class="summary-value">0</strong>
+                </article>
+
+                <article class="summary-card">
+                    <span class="summary-label">Bus Lines</span>
+                    <strong id="busLineCount" class="summary-value">0</strong>
+                </article>
+
+                <article class="summary-card">
+                    <span class="summary-label">Train Lines</span>
+                    <strong id="trainLineCount" class="summary-value">0</strong>
+                </article>
+            </section>
+
+            <section class="info-strip">
+                <div class="legend">
+                    <span class="legend-title">Legend</span>
+
+                    <span class="legend-item">
+                        <span class="legend-dot bus-station"></span>
+                        Bus Station
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="legend-dot train-station"></span>
+                        Train Station
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="legend-dot shopping-mall"></span>
+                        Shopping Mall
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="legend-dot residential-building"></span>
+                        Residential Building
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="legend-dot recreation-park"></span>
+                        Recreation Park
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="legend-line bus-line"></span>
+                        Bus Line
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="legend-line train-line"></span>
+                        Train Line
+                    </span>
+                </div>
+
+                <div id="routeSummary" class="route-summary">
+                    No preview loaded yet.
+                </div>
+            </section>
+
+            <section class="map-frame">
+                <div id="mapEmptyState" class="map-empty-state">
+                    <div class="map-empty-card">
+                        <h3>Nothing to preview yet</h3>
+                        <p>
+                            Hover a map name in the left sidebar to show its landmarks,
+                            bus lines, and train lines here.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="previewMap" class="preview-map" aria-label="Map preview"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="MapPreviewer.js"></script>
+</body>
+</html>
