@@ -51,8 +51,6 @@ const elements = {
     startLandmarkDisplay: null,
     endLandmarkDisplay: null,
     computePathBtn: null,
-    clearSelectionsBtn: null,
-    resetOptionsBtn: null,
     queryResultStatus: null,
     queryResultOutput: null
 };
@@ -104,8 +102,6 @@ function cacheElements() {
     elements.startLandmarkDisplay = document.getElementById("startLandmarkDisplay");
     elements.endLandmarkDisplay = document.getElementById("endLandmarkDisplay");
     elements.computePathBtn = document.getElementById("computePathBtn");
-    elements.clearSelectionsBtn = document.getElementById("clearSelectionsBtn");
-    elements.resetOptionsBtn = document.getElementById("resetOptionsBtn");
     elements.queryResultStatus = document.getElementById("queryResultStatus");
     elements.queryResultOutput = document.getElementById("queryResultOutput");
 }
@@ -121,16 +117,6 @@ function bindEvents() {
 
     elements.pickEndBtn.addEventListener("click", () => {
         setSelectionMode("end");
-    });
-
-    elements.clearSelectionsBtn.addEventListener("click", () => {
-        clearSelections();
-        setStatus("Selection cleared", "idle");
-    });
-
-    elements.resetOptionsBtn.addEventListener("click", () => {
-        resetQueryOptions();
-        setStatus("Options reset", "idle");
     });
 
     elements.computePathBtn.addEventListener("click", () => {
@@ -628,28 +614,6 @@ function clearSelections() {
     updateSelectionModeUI();
     updateSelectionDisplays();
     updateLandmarkSelectionStyles();
-    updateQueryControlsState();
-}
-
-function resetQueryOptions() {
-    document
-        .querySelectorAll('input[name="transports_available"]')
-        .forEach((input) => {
-            input.checked = true;
-        });
-
-    const cheapestRadio = document.querySelector('input[name="element_to_optimize"][value="cheapest"]');
-    const dijkstraRadio = document.querySelector('input[name="algorithm_to_use"][value="dijkstra"]');
-
-    if (cheapestRadio) {
-        cheapestRadio.checked = true;
-    }
-
-    if (dijkstraRadio) {
-        dijkstraRadio.checked = true;
-    }
-
-    setSelectionMode("start");
     updateQueryControlsState();
 }
 
