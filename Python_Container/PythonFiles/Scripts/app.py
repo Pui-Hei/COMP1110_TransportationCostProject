@@ -202,6 +202,7 @@ class BestPath(Resource):
         try:
             payload = extract_request_data()
 
+            map_id = payload.get("map_id")
             start_lm = payload.get("start_lm")
             end_lm = payload.get("end_lm")
             element_to_optimize = payload.get("element_to_optimize")
@@ -210,6 +211,8 @@ class BestPath(Resource):
 
             missing_fields = []
 
+            if map_id in (None, ""):
+                missing_fields.append("map_id")
             if start_lm in (None, ""):
                 missing_fields.append("start_lm")
             if end_lm in (None, ""):
@@ -227,7 +230,16 @@ class BestPath(Resource):
                     "error": f"Missing required field(s): {', '.join(missing_fields)}"
                 }, 400
 
+            try:
+                map_id = int(map_id)
+            except ValueError:
+                return {
+                    "success": False,
+                    "error": "map_id must be an integer"
+                }, 400
+
             result = Transportation_Path_Calculation.get_best_path(
+                map_id=map_id,
                 start_lm=start_lm,
                 end_lm=end_lm,
                 transports_available=transports_available,
