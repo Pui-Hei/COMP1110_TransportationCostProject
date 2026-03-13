@@ -1,0 +1,828 @@
+const API_BASE_URL = "";
+const MAP_PREVIEW_ENDPOINT = (mapId) => `${API_BASE_URL}/maps/${mapId}/preview`;
+const BEST_PATH_ENDPOINT = `${API_BASE_URL}/best-path`;
+
+const DEFAULT_CENTER = [22.24, 114.05];
+const DEFAULT_ZOOM = 10;
+
+const BUS_ROUTE_COLORS = ["#2563eb", "#0ea5e9", "#0284c7", "#06b6d4", "#1d4ed8"];
+const TRAIN_ROUTE_COLORS = ["#dc2626", "#f97316", "#e11d48", "#b91c1c", "#ef4444"];
+
+const LANDMARK_TYPE_COLORS = {
+    "Bus Station": "#2563eb",
+    "Train Station": "#dc2626",
+    "Shopping Mall": "#9333ea",
+    "Residential Building": "#6b7280",
+    "Recreation Park": "#16a34a"
+};
+
+const START_SELECTION_COLOR = "#16a34a";
+const END_SELECTION_COLOR = "#e11d48";
+
+const state = {
+    leafletMap: null,
+    landmarkLayer: null,
+    busLayer: null,
+    trainLayer: null,
+    activeMapId: null,
+    activeMapName: "",
+    renderedLandmarkMarkers: [],
+    selectionMode: "start",
+    startSelection: null,
+    endSelection: null,
+    submittingQuery: false,
+    latestRequestId: 0
+};
+
+const elements = {
+    backButton: null,
+    previewTitle: null,
+    previewSubtitle: null,
+    statusBadge: null,
+    landmarkCount: null,
+    busLineCount: null,
+    trainLineCount: null,
+    routeSummary: null,
+    mapEmptyState: null,
+    queryMap: null,
+    selectionHint: null,
+    pickStartBtn: null,
+    pickEndBtn: null,
+    startLandmarkDisplay: null,
+    endLandmarkDisplay: null,
+    computePathBtn: null,
+    clearSelectionsBtn: null,
+    resetOptionsBtn: null,
+    queryResultStatus: null,
+    queryResultOutput: null
+};
+
+document.addEventListener("DOMContentLoaded", init);
+
+function init() {
+    cacheElements();
+    bindEvents();
+
+    try {
+        initLeaflet();
+    } catch (error) {
+        console.error("Leaflet initialization failed:", error);
+        setStatus("Leaflet failed", "error");
+        elements.previewTitle.textContent = "Leaflet failed to initialize";
+        elements.previewSubtitle.textContent = "Check browser console for more details.";
+        return;
+    }
+
+    updateSelectionModeUI();
+    updateSelectionDisplays();
+    updateQueryControlsState();
+    resetQueryResult();
+
+    loadSelectedMapFromUrl();
+
+    window.addEventListener("resize", () => {
+        if (state.leafletMap) {
+            setTimeout(() => state.leafletMap.invalidateSize(), 0);
+        }
+    });
+}
+
+function cacheElements() {
+    elements.backButton = document.getElementById("backButton");
+    elements.previewTitle = document.getElementById("previewTitle");
+    elements.previewSubtitle = document.getElementById("previewSubtitle");
+    elements.statusBadge = document.getElementById("statusBadge");
+    elements.landmarkCount = document.getElementById("landmarkCount");
+    elements.busLineCount = document.getElementById("busLineCount");
+    elements.trainLineCount = document.getElementById("trainLineCount");
+    elements.routeSummary = document.getElementById("routeSummary");
+    elements.mapEmptyState = document.getElementById("mapEmptyState");
+    elements.queryMap = document.getElementById("queryMap");
+    elements.selectionHint = document.getElementById("selectionHint");
+    elements.pickStartBtn = document.getElementById("pickStartBtn");
+    elements.pickEndBtn = document.getElementById("pickEndBtn");
+    elements.startLandmarkDisplay = document.getElementById("startLandmarkDisplay");
+    elements.endLandmarkDisplay = document.getElementById("endLandmarkDisplay");
+    elements.computePathBtn = document.getElementById("computePathBtn");
+    elements.clearSelectionsBtn = document.getElementById("clearSelectionsBtn");
+    elements.resetOptionsBtn = document.getElementById("resetOptionsBtn");
+    elements.queryResultStatus = document.getElementById("queryResultStatus");
+    elements.queryResultOutput = document.getElementById("queryResultOutput");
+}
+
+function bindEvents() {
+    elements.backButton.addEventListener("click", () => {
+        window.location.href = "MapPreviewer.html";
+    });
+
+    elements.pickStartBtn.addEventListener("click", () => {
+        setSelectionMode("start");
+    });
+
+    elements.pickEndBtn.addEventListener("click", () => {
+        setSelectionMode("end");
+    });
+
+    elements.clearSelectionsBtn.addEventListener("click", () => {
+        clearSelections();
+        setStatus("Selection cleared", "idle");
+    });
+
+    elements.resetOptionsBtn.addEventListener("click", () => {
+        resetQueryOptions();
+        setStatus("Options reset", "idle");
+    });
+
+    elements.computePathBtn.addEventListener("click", () => {
+        submitBestPathQuery();
+    });
+
+    document
+        .querySelectorAll('input[name="transports_available"], input[name="element_to_optimize"], input[name="algorithm_to_use"]')
+        .forEach((input) => {
+            input.addEventListener("change", () => {
+                updateQueryControlsState();
+            });
+        });
+}
+
+function initLeaflet() {
+    state.leafletMap = L.map("queryMap", {
+        attributionControl: false,
+        zoomControl: true,
+        preferCanvas: true,
+        zoomSnap: 0.25
+    });
+
+    state.leafletMap.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+    state.busLayer = L.layerGroup().addTo(state.leafletMap);
+    state.trainLayer = L.layerGroup().addTo(state.leafletMap);
+    state.landmarkLayer = L.layerGroup().addTo(state.leafletMap);
+}
+
+function loadSelectedMapFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const rawMapId = params.get("mapId");
+
+    if (!rawMapId) {
+        showPageError("Missing mapId in URL. Please open this page from Map Previewer.");
+        return;
+    }
+
+    const mapId = Number(rawMapId);
+
+    if (!Number.isInteger(mapId) || mapId <= 0) {
+        showPageError("Invalid mapId in URL. Please return to Map Previewer and try again.");
+        return;
+    }
+
+    loadPreview(mapId);
+}
+
+async function loadPreview(mapId) {
+    state.activeMapId = mapId;
+    clearSelections();
+    resetQueryResult();
+    hideEmptyState();
+    setStatus("Loading map...", "loading");
+    setPreviewLoadingText(mapId);
+
+    const requestId = ++state.latestRequestId;
+
+    try {
+        const result = await fetchJson(MAP_PREVIEW_ENDPOINT(mapId));
+
+        if (requestId !== state.latestRequestId) {
+            return;
+        }
+
+        if (!result.success) {
+            throw new Error(result.error || "Failed to load preview.");
+        }
+
+        renderPreview(result);
+        setStatus("Map ready", "ready");
+    } catch (error) {
+        if (requestId !== state.latestRequestId) {
+            return;
+        }
+
+        console.error("loadPreview failed:", error);
+        showPageError(error.message || "Failed to load selected map.");
+    }
+}
+
+function renderPreview(data) {
+    clearMapLayers();
+
+    const mapInfo = data.map || {};
+    const landmarks = Array.isArray(data.landmarks) ? data.landmarks : [];
+    const busLines = Array.isArray(data.bus_lines) ? data.bus_lines : [];
+    const trainLines = Array.isArray(data.train_lines) ? data.train_lines : [];
+
+    state.activeMapName = mapInfo.map_name || "Unnamed Map";
+
+    elements.previewTitle.textContent = state.activeMapName;
+    elements.previewSubtitle.textContent = `Map ID: ${mapInfo.map_id ?? "-"} • Click landmarks on the map to choose start and end points.`;
+
+    updateCounts(landmarks.length, busLines.length, trainLines.length);
+    updateRouteSummary(busLines, trainLines);
+
+    const boundsPoints = [];
+
+    renderBusLines(busLines, boundsPoints);
+    renderTrainLines(trainLines, boundsPoints);
+    renderLandmarks(landmarks, boundsPoints);
+
+    fitMapToBounds(boundsPoints);
+    hideEmptyState();
+    updateSelectionModeUI();
+    updateSelectionDisplays();
+    updateQueryControlsState();
+}
+
+function renderLandmarks(landmarks, boundsPoints) {
+    landmarks.forEach((landmark) => {
+        const lat = Number(landmark.latitude);
+        const lng = Number(landmark.longitude);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return;
+        }
+
+        boundsPoints.push([lat, lng]);
+
+        const key = getLandmarkKey(landmark);
+        const marker = L.circleMarker([lat, lng], getLandmarkMarkerStyle(landmark, key));
+
+        const tooltipHtml = `
+            <div class="tooltip-title">${escapeHtml(landmark.landmark_name || "Unnamed Landmark")}</div>
+            <div class="tooltip-subtitle">
+                ${escapeHtml(landmark.type || "Unknown Type")}
+                ${landmark.abbreviation ? ` (${escapeHtml(landmark.abbreviation)})` : ""}
+            </div>
+            <div class="tooltip-subtitle">Click to select</div>
+        `;
+
+        marker.bindTooltip(tooltipHtml, {
+            direction: "top",
+            sticky: true,
+            className: "landmark-tooltip"
+        });
+
+        marker.on("click", () => {
+            handleLandmarkClick(landmark);
+            marker.openTooltip();
+        });
+
+        marker.addTo(state.landmarkLayer);
+
+        state.renderedLandmarkMarkers.push({
+            key,
+            landmark,
+            marker
+        });
+    });
+
+    updateLandmarkSelectionStyles();
+}
+
+function renderBusLines(busLines, boundsPoints) {
+    busLines.forEach((line, index) => {
+        const stops = Array.isArray(line.stops) ? line.stops : [];
+        const latLngs = stops
+            .map((stop) => [Number(stop.latitude), Number(stop.longitude)])
+            .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+
+        if (!latLngs.length) {
+            return;
+        }
+
+        latLngs.forEach((point) => boundsPoints.push(point));
+
+        const color = BUS_ROUTE_COLORS[index % BUS_ROUTE_COLORS.length];
+
+        const polyline = L.polyline(latLngs, {
+            color,
+            weight: 4,
+            opacity: 0.85,
+            lineCap: "round",
+            lineJoin: "round"
+        });
+
+        const tooltipHtml = `
+            <div class="tooltip-title">${escapeHtml(line.line_code || "Bus Line")}</div>
+            <div class="tooltip-subtitle">
+                Bus line • ${stops.length} stop(s)
+                ${typeof line.flat_price !== "undefined" ? ` • Flat price: ${escapeHtml(String(line.flat_price))}` : ""}
+            </div>
+        `;
+
+        polyline.bindTooltip(tooltipHtml, {
+            sticky: true,
+            className: "route-tooltip"
+        });
+
+        polyline.addTo(state.busLayer);
+    });
+}
+
+function renderTrainLines(trainLines, boundsPoints) {
+    trainLines.forEach((line, index) => {
+        const stops = Array.isArray(line.stops) ? line.stops : [];
+        const latLngs = stops
+            .map((stop) => [Number(stop.latitude), Number(stop.longitude)])
+            .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+
+        if (!latLngs.length) {
+            return;
+        }
+
+        latLngs.forEach((point) => boundsPoints.push(point));
+
+        const color = TRAIN_ROUTE_COLORS[index % TRAIN_ROUTE_COLORS.length];
+
+        const polyline = L.polyline(latLngs, {
+            color,
+            weight: 5,
+            opacity: 0.9,
+            dashArray: "10 8",
+            lineCap: "round",
+            lineJoin: "round"
+        });
+
+        const tooltipHtml = `
+            <div class="tooltip-title">${escapeHtml(line.line_code || "Train Line")}</div>
+            <div class="tooltip-subtitle">
+                Train line • ${stops.length} stop(s)
+            </div>
+        `;
+
+        polyline.bindTooltip(tooltipHtml, {
+            sticky: true,
+            className: "route-tooltip"
+        });
+
+        polyline.addTo(state.trainLayer);
+    });
+}
+
+function fitMapToBounds(boundsPoints) {
+    if (!state.leafletMap) {
+        return;
+    }
+
+    if (!boundsPoints.length) {
+        state.leafletMap.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+        setTimeout(() => state.leafletMap.invalidateSize(), 0);
+        return;
+    }
+
+    const bounds = L.latLngBounds(boundsPoints);
+
+    state.leafletMap.fitBounds(bounds, {
+        padding: [30, 30],
+        maxZoom: 13
+    });
+
+    setTimeout(() => state.leafletMap.invalidateSize(), 0);
+}
+
+function clearMapLayers() {
+    if (state.landmarkLayer) {
+        state.landmarkLayer.clearLayers();
+    }
+
+    if (state.busLayer) {
+        state.busLayer.clearLayers();
+    }
+
+    if (state.trainLayer) {
+        state.trainLayer.clearLayers();
+    }
+
+    state.renderedLandmarkMarkers = [];
+}
+
+function updateCounts(landmarkCount, busLineCount, trainLineCount) {
+    elements.landmarkCount.textContent = String(landmarkCount);
+    elements.busLineCount.textContent = String(busLineCount);
+    elements.trainLineCount.textContent = String(trainLineCount);
+}
+
+function updateRouteSummary(busLines, trainLines) {
+    const busCodes = busLines.map((line) => line.line_code).filter(Boolean);
+    const trainCodes = trainLines.map((line) => line.line_code).filter(Boolean);
+
+    const busText = busCodes.length
+        ? `Bus: ${busCodes.join(", ")}`
+        : "Bus: none";
+
+    const trainText = trainCodes.length
+        ? `Train: ${trainCodes.join(", ")}`
+        : "Train: none";
+
+    elements.routeSummary.textContent = `${busText} | ${trainText}`;
+}
+
+function setPreviewLoadingText(mapId) {
+    elements.previewTitle.textContent = `Loading map ${mapId}...`;
+    elements.previewSubtitle.textContent = "Fetching preview data from the API.";
+    elements.routeSummary.textContent = "Loading route information...";
+}
+
+function showPageError(message) {
+    clearMapLayers();
+    updateCounts(0, 0, 0);
+    showEmptyState();
+
+    elements.previewTitle.textContent = "Map unavailable";
+    elements.previewSubtitle.textContent = message;
+    elements.routeSummary.textContent = "Could not load the selected map.";
+    setStatus("Load failed", "error");
+
+    clearSelections();
+    resetQueryResult();
+    updateQueryControlsState();
+}
+
+function showEmptyState() {
+    elements.mapEmptyState.classList.remove("hidden");
+}
+
+function hideEmptyState() {
+    elements.mapEmptyState.classList.add("hidden");
+}
+
+function setStatus(text, type) {
+    elements.statusBadge.textContent = text;
+    elements.statusBadge.className = `status-badge ${type}`;
+}
+
+function setSelectionMode(mode) {
+    state.selectionMode = mode === "end" ? "end" : "start";
+    updateSelectionModeUI();
+}
+
+function updateSelectionModeUI() {
+    elements.pickStartBtn.classList.toggle("active", state.selectionMode === "start");
+    elements.pickEndBtn.classList.toggle("active", state.selectionMode === "end");
+
+    if (!state.activeMapId) {
+        elements.selectionHint.textContent = "No map loaded.";
+        return;
+    }
+
+    if (state.selectionMode === "start") {
+        elements.selectionHint.textContent = "Click a landmark on the map to choose the start point.";
+    } else {
+        elements.selectionHint.textContent = "Click a landmark on the map to choose the end point.";
+    }
+}
+
+function handleLandmarkClick(landmark) {
+    const selection = buildLandmarkSelection(landmark);
+
+    if (state.selectionMode === "start") {
+        state.startSelection = selection;
+
+        if (state.endSelection && state.endSelection.key === selection.key) {
+            state.endSelection = null;
+        }
+
+        setSelectionMode("end");
+        setStatus("Start selected", "ready");
+    } else {
+        state.endSelection = selection;
+
+        if (state.startSelection && state.startSelection.key === selection.key) {
+            state.startSelection = null;
+        }
+
+        setStatus("End selected", "ready");
+    }
+
+    updateSelectionDisplays();
+    updateLandmarkSelectionStyles();
+    updateQueryControlsState();
+}
+
+function buildLandmarkSelection(landmark) {
+    return {
+        key: getLandmarkKey(landmark),
+        label: landmark.landmark_name || landmark.abbreviation || "Unnamed Landmark",
+        value: getLandmarkRequestValue(landmark),
+        type: landmark.type || ""
+    };
+}
+
+function getLandmarkRequestValue(landmark) {
+    if (landmark.landmark_name) {
+        return String(landmark.landmark_name);
+    }
+
+    if (landmark.abbreviation) {
+        return String(landmark.abbreviation);
+    }
+
+    if (landmark.landmark_id !== undefined && landmark.landmark_id !== null) {
+        return String(landmark.landmark_id);
+    }
+
+    if (landmark.id !== undefined && landmark.id !== null) {
+        return String(landmark.id);
+    }
+
+    return getLandmarkKey(landmark);
+}
+
+function getLandmarkKey(landmark) {
+    if (landmark.landmark_id !== undefined && landmark.landmark_id !== null && landmark.landmark_id !== "") {
+        return `id:${landmark.landmark_id}`;
+    }
+
+    if (landmark.id !== undefined && landmark.id !== null && landmark.id !== "") {
+        return `id:${landmark.id}`;
+    }
+
+    return [
+        landmark.landmark_name || landmark.abbreviation || "unnamed",
+        landmark.latitude,
+        landmark.longitude
+    ].join("|");
+}
+
+function updateSelectionDisplays() {
+    updateSingleSelectionDisplay(
+        elements.startLandmarkDisplay,
+        state.startSelection,
+        "Not selected"
+    );
+
+    updateSingleSelectionDisplay(
+        elements.endLandmarkDisplay,
+        state.endSelection,
+        "Not selected"
+    );
+}
+
+function updateSingleSelectionDisplay(element, selection, emptyText) {
+    if (!selection) {
+        element.textContent = emptyText;
+        element.classList.add("empty");
+        return;
+    }
+
+    element.textContent = selection.type
+        ? `${selection.label} • ${selection.type}`
+        : selection.label;
+
+    element.classList.remove("empty");
+}
+
+function updateLandmarkSelectionStyles() {
+    state.renderedLandmarkMarkers.forEach(({ key, landmark, marker }) => {
+        marker.setStyle(getLandmarkMarkerStyle(landmark, key));
+    });
+}
+
+function getLandmarkMarkerStyle(landmark, key) {
+    const isStart = state.startSelection && state.startSelection.key === key;
+    const isEnd = state.endSelection && state.endSelection.key === key;
+
+    if (isStart) {
+        return {
+            radius: 9,
+            color: "#ffffff",
+            weight: 3,
+            fillColor: START_SELECTION_COLOR,
+            fillOpacity: 1
+        };
+    }
+
+    if (isEnd) {
+        return {
+            radius: 9,
+            color: "#ffffff",
+            weight: 3,
+            fillColor: END_SELECTION_COLOR,
+            fillOpacity: 1
+        };
+    }
+
+    return {
+        radius: 6,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: getLandmarkColor(landmark.type),
+        fillOpacity: 0.95
+    };
+}
+
+function clearSelections() {
+    state.startSelection = null;
+    state.endSelection = null;
+    state.selectionMode = "start";
+
+    updateSelectionModeUI();
+    updateSelectionDisplays();
+    updateLandmarkSelectionStyles();
+    updateQueryControlsState();
+}
+
+function resetQueryOptions() {
+    document
+        .querySelectorAll('input[name="transports_available"]')
+        .forEach((input) => {
+            input.checked = true;
+        });
+
+    const cheapestRadio = document.querySelector('input[name="element_to_optimize"][value="cheapest"]');
+    const dijkstraRadio = document.querySelector('input[name="algorithm_to_use"][value="dijkstra"]');
+
+    if (cheapestRadio) {
+        cheapestRadio.checked = true;
+    }
+
+    if (dijkstraRadio) {
+        dijkstraRadio.checked = true;
+    }
+
+    setSelectionMode("start");
+    updateQueryControlsState();
+}
+
+function getSelectedTransports() {
+    return Array.from(
+        document.querySelectorAll('input[name="transports_available"]:checked')
+    ).map((input) => input.value);
+}
+
+function getSelectedOptimization() {
+    const selected = document.querySelector('input[name="element_to_optimize"]:checked');
+    return selected ? selected.value : "";
+}
+
+function getSelectedAlgorithm() {
+    const selected = document.querySelector('input[name="algorithm_to_use"]:checked');
+    return selected ? selected.value : "";
+}
+
+function updateQueryControlsState() {
+    const canSubmit =
+        !state.submittingQuery &&
+        !!state.activeMapId &&
+        !!state.startSelection &&
+        !!state.endSelection &&
+        getSelectedTransports().length > 0 &&
+        state.startSelection.key !== state.endSelection.key;
+
+    elements.computePathBtn.disabled = !canSubmit;
+}
+
+async function submitBestPathQuery() {
+    if (!state.activeMapId) {
+        setQueryResultError("No map loaded.");
+        return;
+    }
+
+    if (!state.startSelection) {
+        setQueryResultError("Please select a start landmark by clicking on the map.");
+        return;
+    }
+
+    if (!state.endSelection) {
+        setQueryResultError("Please select an end landmark by clicking on the map.");
+        return;
+    }
+
+    if (state.startSelection.key === state.endSelection.key) {
+        setQueryResultError("Start and end landmarks must be different.");
+        return;
+    }
+
+    const transportsAvailable = getSelectedTransports();
+
+    if (!transportsAvailable.length) {
+        setQueryResultError("Please choose at least one transport option.");
+        return;
+    }
+
+    const payload = {
+        map_id: state.activeMapId,
+        start_lm: state.startSelection.value,
+        end_lm: state.endSelection.value,
+        transports_available: transportsAvailable,
+        element_to_optimize: getSelectedOptimization(),
+        algorithm_to_use: getSelectedAlgorithm()
+    };
+
+    state.submittingQuery = true;
+    updateQueryControlsState();
+
+    setStatus("Querying path...", "loading");
+    setQueryResultStatus("Loading...", "loading");
+    elements.queryResultOutput.textContent = `POST ${BEST_PATH_ENDPOINT}\n\n${JSON.stringify(payload, null, 2)}`;
+
+    try {
+        const result = await postJson(BEST_PATH_ENDPOINT, payload);
+
+        elements.queryResultOutput.textContent = JSON.stringify(result, null, 2);
+
+        if (result.success) {
+            setStatus("Query complete", "ready");
+            setQueryResultStatus("Success", "ready");
+        } else {
+            setStatus("Query failed", "error");
+            setQueryResultStatus("Failed", "error");
+        }
+    } catch (error) {
+        console.error("submitBestPathQuery failed:", error);
+        setStatus("Query failed", "error");
+        setQueryResultStatus("Failed", "error");
+        elements.queryResultOutput.textContent = error.message;
+    } finally {
+        state.submittingQuery = false;
+        updateQueryControlsState();
+    }
+}
+
+function resetQueryResult() {
+    setQueryResultStatus("Waiting...", "idle");
+    elements.queryResultOutput.textContent = "No path query has been sent yet.";
+}
+
+function setQueryResultError(message) {
+    setStatus("Invalid query", "error");
+    setQueryResultStatus("Error", "error");
+    elements.queryResultOutput.textContent = message;
+}
+
+function setQueryResultStatus(text, type) {
+    elements.queryResultStatus.textContent = text;
+    elements.queryResultStatus.className = `result-status ${type}`;
+}
+
+function getLandmarkColor(type) {
+    return LANDMARK_TYPE_COLORS[type] || "#334155";
+}
+
+async function fetchJson(url) {
+    const response = await fetch(url, {
+        method: "GET",
+        headers: {
+            "Accept": "application/json"
+        }
+    });
+
+    const text = await response.text();
+
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch (error) {
+        throw new Error(`Non-JSON response from ${url}`);
+    }
+
+    if (!response.ok) {
+        throw new Error(data.error || `Request failed with status ${response.status}`);
+    }
+
+    return data;
+}
+
+async function postJson(url, payload) {
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+    });
+
+    const text = await response.text();
+
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch (error) {
+        throw new Error(`Non-JSON response from ${url}`);
+    }
+
+    if (!response.ok) {
+        throw new Error(data.error || `Request failed with status ${response.status}`);
+    }
+
+    return data;
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+}

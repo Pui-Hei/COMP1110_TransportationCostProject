@@ -143,36 +143,38 @@ function renderMapsList(maps) {
     const fragment = document.createDocumentFragment();
 
     maps.forEach((mapItem) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "map-button";
-        button.dataset.mapId = String(mapItem.map_id);
+        const link = document.createElement("a");
+        const targetUrl = new URL("MapPathQuery.html", window.location.href);
+        targetUrl.searchParams.set("mapId", String(mapItem.map_id));
 
-        button.innerHTML = `
-            <span class="map-button-name">${escapeHtml(mapItem.map_name)}</span>
+        link.className = "map-button";
+        link.dataset.mapId = String(mapItem.map_id);
+        link.href = targetUrl.toString();
+
+        link.innerHTML = `
+            <span class="map-button-name">${escapeHtml(mapItem.map_name || "Unnamed Map")}</span>
             <span class="map-button-meta">Map ID: ${escapeHtml(String(mapItem.map_id))}</span>
         `;
 
-        button.addEventListener("mouseenter", () => {
+        link.addEventListener("mouseenter", () => {
             schedulePreview(mapItem.map_id);
         });
 
-        button.addEventListener("focus", () => {
+        link.addEventListener("focus", () => {
             schedulePreview(mapItem.map_id);
         });
 
-        button.addEventListener("click", () => {
+        link.addEventListener("click", () => {
             clearHoverTimer();
-            loadPreview(mapItem.map_id);
+            console.log("Navigating to:", targetUrl.toString());
         });
 
-        fragment.appendChild(button);
+        fragment.appendChild(link);
     });
 
     elements.mapsList.innerHTML = "";
     elements.mapsList.appendChild(fragment);
 }
-
 function schedulePreview(mapId) {
     clearHoverTimer();
     state.hoverTimer = window.setTimeout(() => {

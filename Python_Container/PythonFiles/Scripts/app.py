@@ -5,9 +5,36 @@ import mysql.connector
 from mysql.connector import Error
 import CSV_to_SQL
 import SQL_Data_Retriever
+import Transportation_Path_Calculation
 
 app = Flask(__name__)
 api = Api(app)
+
+
+def extract_request_data():
+    if request.is_json:
+        payload = request.get_json(silent=True)
+        return payload if isinstance(payload, dict) else {}
+    return request.form
+
+
+def parse_transports_available(payload):
+    raw_value = payload.get("transports_available")
+
+    if isinstance(raw_value, list):
+        return raw_value
+
+    if hasattr(payload, "getlist"):
+        values = payload.getlist("transports_available")
+        if values:
+            if len(values) == 1 and isinstance(values[0], str) and "," in values[0]:
+                return [item.strip() for item in values[0].split(",") if item.strip()]
+            return [item for item in values if str(item).strip()]
+
+    if isinstance(raw_value, str):
+        return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+    return []
 
 
 class HealthCheck(Resource):
@@ -156,6 +183,7 @@ class MapTrainLines(Resource):
 
         return result, 500
 
+
 class MapPreview(Resource):
     def get(self, map_id):
         result = SQL_Data_Retriever.get_map_preview(map_id)
@@ -169,6 +197,62 @@ class MapPreview(Resource):
         return result, 500
 
 
+class BestPath(Resource):
+    def post(self):
+        try:
+            payload = extract_request_data()
+
+            start_lm = payload.get("start_lm")
+            end_lm = payload.get("end_lm")
+            element_to_optimize = payload.get("element_to_optimize")
+            algorithm_to_use = payload.get("algorithm_to_use")
+            transports_available = parse_transports_available(payload)
+
+            missing_fields = []
+
+            if start_lm in (None, ""):
+                missing_fields.append("start_lm")
+            if end_lm in (None, ""):
+                missing_fields.append("end_lm")
+            if element_to_optimize in (None, ""):
+                missing_fields.append("element_to_optimize")
+            if algorithm_to_use in (None, ""):
+                missing_fields.append("algorithm_to_use")
+            if not transports_available:
+                missing_fields.append("transports_available")
+
+            if missing_fields:
+                return {
+                    "success": False,
+                    "error": f"Missing required field(s): {', '.join(missing_fields)}"
+                }, 400
+
+            result = Transportation_Path_Calculation.get_best_path(
+                start_lm=start_lm,
+                end_lm=end_lm,
+                transports_available=transports_available,
+                element_to_optimize=element_to_optimize,
+                algorithm_to_use=algorithm_to_use
+            )
+
+            if result.get("success"):
+                return result, 200
+
+            return result, 400
+
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }, 400
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }, 500
+
+
 api.add_resource(Home, '/')
 api.add_resource(HealthCheck, '/health')
 api.add_resource(ImportMapData, '/import-map-data')
@@ -177,6 +261,7 @@ api.add_resource(MapLandmarks, '/maps/<int:map_id>/landmarks')
 api.add_resource(MapBusLines, '/maps/<int:map_id>/bus-lines')
 api.add_resource(MapTrainLines, '/maps/<int:map_id>/train-lines')
 api.add_resource(MapPreview, '/maps/<int:map_id>/preview')
+api.add_resource(BestPath, '/best-path')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
