@@ -1,247 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map Path Query</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="MapPathQuery.css">
+    <style>
+        /* Ensure the sidebar takes up space first and the map fills the rest */
+        .main-content {
+            display: flex;
+            flex-direction: row;
+            gap: 1rem;
+            height: calc(100vh - 150px); /* Approximate height adjustment */
+            min-height: 500px;
+        }
+        
+        .left-toolbar {
+            flex: 0 0 350px; /* Takes up exactly 350px of space first */
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
 
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
-    <link rel="stylesheet" href="MapPathQuery.css" />
+        .map-frame {
+            flex: 1 1 auto; /* Takes up all the remaining space */
+            position: relative;
+            min-height: 400px;
+        }
+
+        .query-map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Responsive layout for mobile screens */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+                height: auto;
+            }
+            .left-toolbar {
+                flex: 0 0 auto;
+                width: 100%;
+            }
+            .map-frame {
+                height: 500px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="app-shell">
+        <!-- Header -->
         <header class="top-header">
             <div class="top-header-left">
-                <button type="button" class="back-button" id="backButton">
-                    ← Back to Map Previewer
-                </button>
-
+                <button id="backButton" class="back-button">← Back to Map Previewer</button>
                 <div class="header-text">
                     <p class="eyebrow">Path Query</p>
-                    <h1 class="page-title" id="previewTitle">Loading map...</h1>
-                    <p class="page-subtitle" id="previewSubtitle">
-                        Loading selected map from URL.
-                    </p>
+                    <h1 id="previewTitle" class="page-title">Loading map...</h1>
+                    <p id="previewSubtitle" class="page-subtitle">Loading selected map from URL.</p>
                 </div>
             </div>
-
-            <div class="status-badge idle" id="statusBadge">Idle</div>
+            <span id="statusBadge" class="status-badge idle">Idle</span>
         </header>
 
-        <section class="summary-grid">
-            <div class="summary-card">
-                <span class="summary-label">Landmarks</span>
-                <span class="summary-value" id="landmarkCount">0</span>
-            </div>
+        <!-- Foldable Summary & Legend (Folded by default) -->
+        <details class="foldable-section">
+            <summary class="foldable-summary">Map Information & Legend</summary>
+            <div class="foldable-content">
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <span class="summary-label">Landmarks</span>
+                        <span id="landmarkCount" class="summary-value">0</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-label">Bus Lines</span>
+                        <span id="busLineCount" class="summary-value">0</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-label">Train Lines</span>
+                        <span id="trainLineCount" class="summary-value">0</span>
+                    </div>
+                </div>
 
-            <div class="summary-card">
-                <span class="summary-label">Bus Lines</span>
-                <span class="summary-value" id="busLineCount">0</span>
-            </div>
-
-            <div class="summary-card">
-                <span class="summary-label">Train Lines</span>
-                <span class="summary-value" id="trainLineCount">0</span>
-            </div>
-        </section>
-
-        <section class="info-strip">
-            <div class="legend">
-                <span class="legend-title">Legend</span>
-
-                <span class="legend-item">
-                    <span class="legend-dot bus-station"></span>
-                    Bus Station
-                </span>
-
-                <span class="legend-item">
-                    <span class="legend-dot train-station"></span>
-                    Train Station
-                </span>
-
-                <span class="legend-item">
-                    <span class="legend-dot shopping-mall"></span>
-                    Shopping Mall
-                </span>
-
-                <span class="legend-item">
-                    <span class="legend-dot residential-building"></span>
-                    Residential Building
-                </span>
-
-                <span class="legend-item">
-                    <span class="legend-dot recreation-park"></span>
-                    Recreation Park
-                </span>
-
-                <span class="legend-item">
-                    <span class="legend-line bus-line"></span>
-                    Bus Line
-                </span>
-
-                <span class="legend-item">
-                    <span class="legend-line train-line"></span>
-                    Train Line
-                </span>
-
-                <span class="legend-item">
-                    <span class="legend-dot start-point"></span>
-                    Start
-                </span>
-
-                <span class="legend-item">
-                    <span class="legend-dot end-point"></span>
-                    End
-                </span>
-            </div>
-
-            <div class="route-summary" id="routeSummary">
-                Loading route information...
-            </div>
-        </section>
-
-        <section class="map-frame">
-            <div class="query-map" id="queryMap"></div>
-
-            <div class="map-empty-state" id="mapEmptyState">
-                <div class="map-empty-card">
-                    <h3>No map loaded</h3>
-                    <p>
-                        Open this page from Map Previewer so it receives a valid map ID.
-                    </p>
+                <div class="info-strip">
+                    <div class="legend">
+                        <span class="legend-title">Legend</span>
+                        <span class="legend-item"><span class="legend-dot bus-station"></span>Bus Station</span>
+                        <span class="legend-item"><span class="legend-dot train-station"></span>Train Station</span>
+                        <span class="legend-item"><span class="legend-dot shopping-mall"></span>Shopping Mall</span>
+                        <span class="legend-item"><span class="legend-dot residential-building"></span>Residential Building</span>
+                        <span class="legend-item"><span class="legend-dot recreation-park"></span>Recreation Park</span>
+                        <span class="legend-item"><span class="legend-line bus-line"></span>Bus Line</span>
+                        <span class="legend-item"><span class="legend-line train-line"></span>Train Line</span>
+                        <span class="legend-item"><span class="legend-dot start-point"></span>Start</span>
+                        <span class="legend-item"><span class="legend-dot end-point"></span>End</span>
+                    </div>
+                    <div id="routeSummary" class="route-summary">Loading route information...</div>
                 </div>
             </div>
-        </section>
+        </details>
 
-        <section class="bottom-toolbar">
-            <div class="toolbar-header">
-                <div>
-                    <h2 class="toolbar-title">Path Query Toolbar</h2>
-                    <p class="toolbar-subtitle" id="selectionHint">
-                        Click a landmark on the map to choose the start point.
-                    </p>
+        <!-- Main Content (Sidebar + Map) -->
+        <div class="main-content">
+            <!-- Left Toolbar -->
+            <aside class="left-toolbar">
+                <div class="toolbar-header">
+                    <div>
+                        <h2 class="toolbar-title">Path Query Toolbar</h2>
+                        <p id="selectionHint" class="toolbar-subtitle">Click a landmark on the map to choose the start point.</p>
+                    </div>
                 </div>
 
                 <div class="selection-mode-group">
-                    <button type="button" class="mode-button active" id="pickStartBtn">
-                        Pick Start
-                    </button>
-                    <button type="button" class="mode-button" id="pickEndBtn">
-                        Pick End
-                    </button>
+                    <button id="pickStartBtn" class="mode-button active">Pick Start</button>
+                    <button id="pickEndBtn" class="mode-button">Pick End</button>
                 </div>
-            </div>
 
-            <div class="toolbar-grid">
-                <div class="control-card">
-                    <label class="control-label">Start Landmark</label>
-                    <div class="selection-display start empty" id="startLandmarkDisplay">
-                        Not selected
+                <div class="toolbar-grid">
+                    <div class="control-card">
+                        <span class="control-label">Start Landmark</span>
+                        <div id="startLandmarkDisplay" class="selection-display start empty">Not selected</div>
+                    </div>
+                    <div class="control-card">
+                        <span class="control-label">End Landmark</span>
+                        <div id="endLandmarkDisplay" class="selection-display end empty">Not selected</div>
+                    </div>
+                    <div class="control-card">
+                        <span class="control-label">Transports Available</span>
+                        <div class="choice-list">
+                            <label class="choice-item"><input type="checkbox" name="transports_available" value="train" checked> Train</label>
+                            <label class="choice-item"><input type="checkbox" name="transports_available" value="bus" checked> Bus</label>
+                            <label class="choice-item"><input type="checkbox" name="transports_available" value="taxi" checked> Taxi</label>
+                            <label class="choice-item"><input type="checkbox" name="transports_available" value="foot" checked> On Foot</label>
+                        </div>
+                    </div>
+                    <div class="control-card">
+                        <span class="control-label">Optimize For</span>
+                        <div class="choice-list">
+                            <label class="choice-item"><input type="radio" name="element_to_optimize" value="cheapest" checked> Cheapest</label>
+                            <label class="choice-item"><input type="radio" name="element_to_optimize" value="fastest"> Fastest</label>
+                            <label class="choice-item"><input type="radio" name="element_to_optimize" value="least_transfer"> Least Transfer</label>
+                        </div>
+                    </div>
+                    <div class="control-card">
+                        <span class="control-label">Algorithm</span>
+                        <div class="choice-list">
+                            <label class="choice-item"><input type="radio" name="algorithm_to_use" value="dijkstra" checked> Dijkstra</label>
+                            <label class="choice-item"><input type="radio" name="algorithm_to_use" value="astar"> A*</label>
+                            <label class="choice-item"><input type="radio" name="algorithm_to_use" value="greedy"> Greedy</label>
+                        </div>
                     </div>
                 </div>
 
-                <div class="control-card">
-                    <label class="control-label">End Landmark</label>
-                    <div class="selection-display end empty" id="endLandmarkDisplay">
-                        Not selected
-                    </div>
+                <div class="toolbar-actions">
+                    <button id="computePathBtn" class="primary-button" disabled>Query Best Path</button>
+                    <button id="clearSelectionsBtn" class="secondary-button">Clear Landmark Selection</button>
+                    <button id="resetOptionsBtn" class="secondary-button">Reset Options</button>
                 </div>
 
-                <div class="control-card">
-                    <label class="control-label">Transports Available</label>
-                    <div class="choice-list">
-                        <label class="choice-item">
-                            <input type="checkbox" name="transports_available" value="train" checked />
-                            <span>Train</span>
-                        </label>
-
-                        <label class="choice-item">
-                            <input type="checkbox" name="transports_available" value="bus" checked />
-                            <span>Bus</span>
-                        </label>
-
-                        <label class="choice-item">
-                            <input type="checkbox" name="transports_available" value="taxi" checked />
-                            <span>Taxi</span>
-                        </label>
-
-                        <label class="choice-item">
-                            <input type="checkbox" name="transports_available" value="foot" checked />
-                            <span>On Foot</span>
-                        </label>
+                <div class="query-result-card">
+                    <div class="query-result-header">
+                        <span class="query-result-title">Endpoint Result</span>
+                        <span id="queryResultStatus" class="result-status idle">Waiting...</span>
                     </div>
+                    <pre id="queryResultOutput" class="query-result-output">No path query has been sent yet.</pre>
                 </div>
+            </aside>
 
-                <div class="control-card">
-                    <label class="control-label">Optimize For</label>
-                    <div class="choice-list">
-                        <label class="choice-item">
-                            <input type="radio" name="element_to_optimize" value="cheapest" checked />
-                            <span>Cheapest</span>
-                        </label>
-
-                        <label class="choice-item">
-                            <input type="radio" name="element_to_optimize" value="fastest" />
-                            <span>Fastest</span>
-                        </label>
-
-                        <label class="choice-item">
-                            <input type="radio" name="element_to_optimize" value="least_transfer" />
-                            <span>Least Transfer</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="control-card">
-                    <label class="control-label">Algorithm</label>
-                    <div class="choice-list">
-                        <label class="choice-item">
-                            <input type="radio" name="algorithm_to_use" value="dijkstra" checked />
-                            <span>Dijkstra</span>
-                        </label>
-
-                        <label class="choice-item">
-                            <input type="radio" name="algorithm_to_use" value="astar" />
-                            <span>A*</span>
-                        </label>
-
-                        <label class="choice-item">
-                            <input type="radio" name="algorithm_to_use" value="greedy" />
-                            <span>Greedy</span>
-                        </label>
+            <!-- Map -->
+            <div class="map-frame">
+                <div id="queryMap" class="query-map"></div>
+                <div id="mapEmptyState" class="map-empty-state">
+                    <div class="map-empty-card">
+                        <h3>No map loaded</h3>
+                        <p>Open this page from Map Previewer so it receives a valid map ID.</p>
                     </div>
                 </div>
             </div>
-
-            <div class="toolbar-actions">
-                <button type="button" class="primary-button" id="computePathBtn" disabled>
-                    Query Best Path
-                </button>
-
-                <button type="button" class="secondary-button" id="clearSelectionsBtn">
-                    Clear Landmark Selection
-                </button>
-
-                <button type="button" class="secondary-button" id="resetOptionsBtn">
-                    Reset Options
-                </button>
-            </div>
-
-            <div class="query-result-card">
-                <div class="query-result-header">
-                    <span class="query-result-title">Endpoint Result</span>
-                    <span class="result-status idle" id="queryResultStatus">Waiting...</span>
-                </div>
-
-                <pre class="query-result-output" id="queryResultOutput">No path query has been sent yet.</pre>
-            </div>
-        </section>
+        </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="MapPathQuery.js"></script>
 </body>
 </html>
