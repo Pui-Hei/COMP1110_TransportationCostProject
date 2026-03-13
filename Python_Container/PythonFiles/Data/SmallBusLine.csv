@@ -1,0 +1,11 @@
+Line_ID,Stop_Order,Station_Name,Price
+BusLine_1,1,Egg 4 Bus Station,14.1
+BusLine_1,2,Grape 12 Bus Station,14.1
+BusLine_1,3,Egg 5 Bus Station,14.1
+BusLine_1,4,Dog 3 Bus Station,14.1
+BusLine_1,5,Dog 2 Bus Station,14.1
+BusLine_1,6,Apple 1 Bus Station,14.1
+BusLine_1,7,Dog 11 Bus Station,14.1
+BusLine_1,8,Egg 1 Bus Station,14.1
+BusLine_2,1,Grape 13 Bus Station,3.5
+BusLine_2,2,Dog 11 Bus Station,3.5

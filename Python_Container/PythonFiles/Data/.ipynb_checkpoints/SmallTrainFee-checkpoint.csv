@@ -1,0 +1,12 @@
+Line_ID,From_Station,To_Station,Price
+TrainLine_1,Cat 5 Train Station,Cat 4 Train Station,7.71
+TrainLine_1,Cat 4 Train Station,Egg 3 Train Station,6.38
+TrainLine_1,Egg 3 Train Station,Happy 7 Train Station,13.62
+TrainLine_1,Happy 7 Train Station,Grape 1 Train Station,5.59
+TrainLine_1,Grape 1 Train Station,Banana 8 Train Station,10.77
+TrainLine_1,Banana 8 Train Station,Banana 6 Train Station,13.84
+TrainLine_1,Banana 6 Train Station,Cat 1 Train Station,10.75
+TrainLine_1,Cat 1 Train Station,Dog 3 Train Station,10.84
+TrainLine_1,Dog 3 Train Station,Fruit 2 Train Station,20.22
+TrainLine_2,Happy 7 Train Station,Grape 1 Train Station,5.59
+TrainLine_2,Grape 1 Train Station,Banana 8 Train Station,10.77

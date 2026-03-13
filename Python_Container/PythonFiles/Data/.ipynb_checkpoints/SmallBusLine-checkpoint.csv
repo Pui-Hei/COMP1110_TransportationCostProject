@@ -1,0 +1,6 @@
+Line_ID,Stop_Order,Station_Name,Price
+BusLine_1,1,Egg 1 Bus Station,3.2
+BusLine_1,2,Dog 4 Bus Station,3.2
+BusLine_2,1,Grape 3 Bus Station,8.0
+BusLine_2,2,Egg 6 Bus Station,8.0
+BusLine_2,3,Grape 6 Bus Station,8.0

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test CSV Import</title>
+    <link rel="stylesheet" href="CSVImporter.css">
+    <script src="CSVImporter.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <h1>CSV Import Tester</h1>
+        <p>Upload 4 CSV files and import them into a selected map.</p>
+
+        <form id="csvImportForm">
+            <div class="field">
+                <label for="map_id">Map ID</label>
+                <input type="number" id="map_id" name="map_id" required min="1" placeholder="Enter map ID">
+            </div>
+
+            <div class="field">
+                <label for="map_name">Map Name</label>
+                <input type="text" id="map_name" name="map_name" required placeholder="Enter map name">
+            </div>
+
+            <div class="field">
+                <label for="landmarks">Landmarks CSV</label>
+                <input type="file" id="landmarks" name="landmarks" accept=".csv" required>
+            </div>
+
+            <div class="field">
+                <label for="train_lines">Train Lines CSV</label>
+                <input type="file" id="train_lines" name="train_lines" accept=".csv" required>
+            </div>
+
+            <div class="field">
+                <label for="train_fees">Train Fees CSV</label>
+                <input type="file" id="train_fees" name="train_fees" accept=".csv" required>
+            </div>
+
+            <div class="field">
+                <label for="bus_lines">Bus Lines CSV</label>
+                <input type="file" id="bus_lines" name="bus_lines" accept=".csv" required>
+            </div>
+
+            <button type="submit" id="submitBtn">Import CSV Data</button>
+        </form>
+
+        <div class="hint">
+            Expected endpoint: <strong>/import-map-data</strong>
+        </div>
+
+        <div id="result" class="result">Waiting for request...</div>
+    </div>
+</body>
+</html>

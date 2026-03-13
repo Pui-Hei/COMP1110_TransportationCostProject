@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Endpoint Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+            color: #222;
+        }
+
+        .box {
+            background: white;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        h1, h2 {
+            margin-top: 0;
+        }
+
+        input, button {
+            padding: 8px;
+            margin: 4px 0;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        pre {
+            background: #111;
+            color: #0f0;
+            padding: 12px;
+            border-radius: 8px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 120px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Endpoint Tester</h1>
+
+    <div class="box">
+        <h2>Basic GET Endpoints</h2>
+        <button onclick="callEndpoint('/')">Test GET /</button>
+        <button onclick="callEndpoint('/health')">Test GET /health</button>
+        <button onclick="callEndpoint('/maps')">Test GET /maps</button>
+    </div>
+
+    <div class="box">
+        <h2>Map-specific GET Endpoints</h2>
+        <input type="number" id="map_id_lookup" placeholder="Enter map ID">
+        <button onclick="testLandmarks()">Test GET /maps/&lt;id&gt;/landmarks</button>
+        <button onclick="testBusLines()">Test GET /maps/&lt;id&gt;/bus-lines</button>
+        <button onclick="testTrainLines()">Test GET /maps/&lt;id&gt;/train-lines</button>
+        <button onclick="testPreview()">Test GET /maps/&lt;id&gt;/preview</button>
+        
+    </div>
+
+    <div class="box">
+        <h2>Import Map Data</h2>
+        <form id="importForm">
+            <input type="number" id="map_id" name="map_id" placeholder="Map ID" required>
+            <input type="text" id="map_name" name="map_name" placeholder="Map Name" required>
+
+            <div>
+                <label>Landmarks CSV</label><br>
+                <input type="file" id="landmarks" name="landmarks" accept=".csv" required>
+            </div>
+
+            <div>
+                <label>Train Lines CSV</label><br>
+                <input type="file" id="train_lines" name="train_lines" accept=".csv" required>
+            </div>
+
+            <div>
+                <label>Train Fees CSV</label><br>
+                <input type="file" id="train_fees" name="train_fees" accept=".csv" required>
+            </div>
+
+            <div>
+                <label>Bus Lines CSV</label><br>
+                <input type="file" id="bus_lines" name="bus_lines" accept=".csv" required>
+            </div>
+
+            <button type="submit">Test POST /import-map-data</button>
+        </form>
+    </div>
+
+    <div class="box">
+        <h2>Result</h2>
+        <pre id="output">Waiting...</pre>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function show(data) {
+            if (typeof data === 'string') {
+                output.textContent = data;
+            } else {
+                output.textContent = JSON.stringify(data, null, 2);
+            }
+        }
+
+        async function callEndpoint(url, options = {}) {
+            output.textContent = 'Loading...';
+
+            try {
+                const response = await fetch(url, options);
+                const contentType = response.headers.get('content-type') || '';
+
+                let data;
+                if (contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+
+                show({
+                    url: url,
+                    status: response.status,
+                    ok: response.ok,
+                    data: data
+                });
+            } catch (error) {
+                show({
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+
+        function getLookupMapId() {
+            const mapId = document.getElementById('map_id_lookup').value.trim();
+            if (!mapId) {
+                show({ success: false, error: 'Please enter a map ID first.' });
+                return null;
+            }
+            return mapId;
+        }
+
+        function testLandmarks() {
+            const mapId = getLookupMapId();
+            if (mapId) {
+                callEndpoint('/maps/' + mapId + '/landmarks');
+            }
+        }
+
+        function testBusLines() {
+            const mapId = getLookupMapId();
+            if (mapId) {
+                callEndpoint('/maps/' + mapId + '/bus-lines');
+            }
+        }
+        function testTrainLines() {
+            const mapId = getLookupMapId();
+            if (mapId) {
+                callEndpoint('/maps/' + mapId + '/train-lines');
+            }
+        }
+        function testPreview() {
+            const mapId = getLookupMapId();
+            if (mapId) {
+                callEndpoint('/maps/' + mapId + '/preview');
+            }
+        }
+
+
+
+        document.getElementById('importForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            output.textContent = 'Uploading...';
+
+            try {
+                const formData = new FormData();
+                formData.append('map_id', document.getElementById('map_id').value);
+                formData.append('map_name', document.getElementById('map_name').value);
+                formData.append('landmarks', document.getElementById('landmarks').files[0]);
+                formData.append('train_lines', document.getElementById('train_lines').files[0]);
+                formData.append('train_fees', document.getElementById('train_fees').files[0]);
+                formData.append('bus_lines', document.getElementById('bus_lines').files[0]);
+
+                const response = await fetch('/import-map-data', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                show({
+                    url: '/import-map-data',
+                    status: response.status,
+                    ok: response.ok,
+                    data: data
+                });
+            } catch (error) {
+                show({
+                    success: false,
+                    error: error.message
+                });
+            }
+        });
+    </script>
+</body>
+</html>
