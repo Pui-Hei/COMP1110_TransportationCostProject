@@ -1,0 +1,71 @@
+services:
+  db:
+    build:
+      context: ./MySQL_Container
+    container_name: mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: transportation_db
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin_ui
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "8080:80"
+    networks:
+      - app_network
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./Python_Container
+    container_name: python_flask_api
+    ports:
+      - "5000:5000"
+      - "8888:8888"
+    volumes:
+      - ./Python_Container/PythonFiles:/app
+    environment:
+      - DB_HOST=db
+      - DB_USER=appuser
+      - DB_PASSWORD=apppassword
+      - DB_NAME=transportation_db
+    networks:
+      - app_network
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: ./Nginx_Container
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./Nginx_Container/NginxFiles/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./Nginx_Container/NginxFiles/html:/usr/share/nginx/html
+    networks:
+      - app_network
+    depends_on:
+      - api
+    restart: unless-stopped
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
