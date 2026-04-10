@@ -359,6 +359,24 @@ def get_map_preview(map_id):
             """, (line["train_line_id"],))
             line["stops"] = cursor.fetchall()
 
+            cursor.execute("""
+                SELECT
+                    tlf.train_line_fee_id,
+                    tlf.from_station_landmark_id,
+                    lf.landmark_name AS from_station_name,
+                    tlf.to_station_landmark_id,
+                    lt.landmark_name AS to_station_name,
+                    tlf.price
+                FROM train_line_fees tlf
+                INNER JOIN landmarks lf
+                    ON tlf.from_station_landmark_id = lf.landmark_id
+                INNER JOIN landmarks lt
+                    ON tlf.to_station_landmark_id = lt.landmark_id
+                WHERE tlf.train_line_id = %s
+                ORDER BY lf.landmark_name ASC, lt.landmark_name ASC
+            """, (line["train_line_id"],))
+            line["fees"] = cursor.fetchall()
+
         return make_json_safe({
             "success": True,
             "map": map_row,

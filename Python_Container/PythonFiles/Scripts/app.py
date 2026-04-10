@@ -207,6 +207,7 @@ class BestPath(Resource):
             end_lm = payload.get("end_lm")
             element_to_optimize = payload.get("element_to_optimize")
             algorithm_to_use = payload.get("algorithm_to_use")
+            beam_width = payload.get("beam_width")
             transports_available = parse_transports_available(payload)
 
             missing_fields = []
@@ -244,7 +245,8 @@ class BestPath(Resource):
                 end_lm=end_lm,
                 transports_available=transports_available,
                 element_to_optimize=element_to_optimize,
-                algorithm_to_use=algorithm_to_use
+                algorithm_to_use=algorithm_to_use,
+                beam_width=beam_width
             )
 
             if result.get("success"):
