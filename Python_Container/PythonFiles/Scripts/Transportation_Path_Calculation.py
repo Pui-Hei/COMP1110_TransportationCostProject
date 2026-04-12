@@ -29,7 +29,6 @@ SPEEDS_KMH = {
     "foot": 5.0
 }
 
-FOOT_MAX_TOTAL_MINUTES = 15.0
 TAXI_RATE_PER_KM = 12.0
 DEFAULT_TOP_K_PATHS = 3
 DEFAULT_BEAM_WIDTH = 20
@@ -318,14 +317,14 @@ def _path_identity(state):
     )
 
 
-def _advance_state(state, edge, optimization, bus_price_lookup, train_fee_lookup):
+def _advance_state(state, edge, optimization, bus_price_lookup, train_fee_lookup, max_walk_min):
     if edge["to"] in state["node_sequence"]:
         return None
 
     next_foot_minutes = state["foot_minutes"]
     if edge["transport"] == "foot":
         next_foot_minutes += edge["time_min"]
-        if next_foot_minutes > FOOT_MAX_TOTAL_MINUTES + EPSILON:
+        if next_foot_minutes > max_walk_min + EPSILON:
             return None
 
     transfer_delta = _calculate_transfer_delta(
@@ -389,7 +388,8 @@ def _run_dijkstra(
     end_node_id,
     optimization,
     bus_price_lookup,
-    train_fee_lookup
+    train_fee_lookup,
+    max_walk_min
 ):
     start_state = _make_initial_state(start_node_id)
     start_state["objective_score"] = _score_state(start_state, optimization)
@@ -415,7 +415,8 @@ def _run_dijkstra(
                 edge,
                 optimization,
                 bus_price_lookup,
-                train_fee_lookup
+                train_fee_lookup,
+                max_walk_min
             )
 
             if next_state is None:
@@ -443,7 +444,8 @@ def _run_greedy(
     transports_available,
     landmark_lookup,
     bus_price_lookup,
-    train_fee_lookup
+    train_fee_lookup,
+    max_walk_min
 ):
     start_state = _make_initial_state(start_node_id)
     start_state["objective_score"] = _score_state(start_state, optimization)
@@ -465,7 +467,8 @@ def _run_greedy(
                 edge,
                 optimization,
                 bus_price_lookup,
-                train_fee_lookup
+                train_fee_lookup,
+                max_walk_min
             )
 
             if next_state is None:
@@ -510,7 +513,8 @@ def _beam_ranked_paths(
     transports_available,
     landmark_lookup,
     bus_price_lookup,
-    train_fee_lookup
+    train_fee_lookup,
+    max_walk_min
 ):
     start_state = _make_initial_state(start_node_id)
     start_state["objective_score"] = _score_state(start_state, optimization)
@@ -542,7 +546,8 @@ def _beam_ranked_paths(
                     edge,
                     optimization,
                     bus_price_lookup,
-                    train_fee_lookup
+                    train_fee_lookup,
+                    max_walk_min
                 )
 
                 if next_state is None:
@@ -610,8 +615,7 @@ def _state_summary(state):
         "foot_minutes_used": round(state["foot_minutes"], 2)
     }
 
-
-def _build_alternative_outputs(primary_state, ranked_states, landmark_lookup):
+def _build_alternative_outputs(primary_state, ranked_states, landmark_lookup, top_k):
     alternatives = []
     primary_identity = _path_identity(primary_state)
 
@@ -625,7 +629,8 @@ def _build_alternative_outputs(primary_state, ranked_states, landmark_lookup):
             "summary": _state_summary(state)
         })
 
-        if len(alternatives) >= max(0, DEFAULT_TOP_K_PATHS - 1):
+        # Use the dynamic top_k here
+        if len(alternatives) >= max(0, top_k - 1):
             break
 
     return alternatives
@@ -638,7 +643,9 @@ def get_best_path(
     transports_available,
     element_to_optimize,
     algorithm_to_use,
-    beam_width=None
+    beam_width=None,
+    top_k=None,
+    max_walk_min=15.0
 ):
     if map_id is None:
         raise ValueError("map_id is required")
@@ -647,7 +654,10 @@ def get_best_path(
         map_id = int(map_id)
     except ValueError:
         raise ValueError("map_id must be an integer")
-
+    if top_k is None:
+        top_k = DEFAULT_TOP_K_PATHS
+    else:
+        top_k = int(top_k)
     start_lm = _normalize_text(start_lm, "start_lm")
     end_lm = _normalize_text(end_lm, "end_lm")
     transports_available = _normalize_transports(transports_available)
@@ -696,7 +706,8 @@ def get_best_path(
             end_id,
             element_to_optimize,
             bus_price_lookup,
-            train_fee_lookup
+            train_fee_lookup,
+            max_walk_min
         )
     elif algorithm_to_use == "greedy":
         best_state = _run_greedy(
@@ -707,7 +718,8 @@ def get_best_path(
             transports_available,
             landmark_lookup,
             bus_price_lookup,
-            train_fee_lookup
+            train_fee_lookup,
+            max_walk_min
         )
     else:
         return {
@@ -727,12 +739,13 @@ def get_best_path(
         end_node_id=end_id,
         optimization=element_to_optimize,
         beam_width=beam_width,
-        top_k=DEFAULT_TOP_K_PATHS,
+        top_k=top_k,
         strategy=algorithm_to_use,
         transports_available=transports_available,
         landmark_lookup=landmark_lookup,
         bus_price_lookup=bus_price_lookup,
-        train_fee_lookup=train_fee_lookup
+        train_fee_lookup=train_fee_lookup,
+        max_walk_min=max_walk_min
     )
 
     formatted_path = _format_state_path(best_state, landmark_lookup)
@@ -740,7 +753,8 @@ def get_best_path(
     alternative_outputs = _build_alternative_outputs(
         best_state,
         ranked_states,
-        landmark_lookup
+        landmark_lookup,
+        top_k
     )
 
     return {

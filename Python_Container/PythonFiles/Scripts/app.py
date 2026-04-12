@@ -208,8 +208,16 @@ class BestPath(Resource):
             element_to_optimize = payload.get("element_to_optimize")
             algorithm_to_use = payload.get("algorithm_to_use")
             beam_width = payload.get("beam_width")
-            transports_available = parse_transports_available(payload)
+            top_k = payload.get("top_k")
+            max_walk_min = payload.get("max_walk_min")
+            
+            if max_walk_min is not None:
+                max_walk_min = float(max_walk_min)
+            else:
+                max_walk_min = 15.0
 
+            transports_available = parse_transports_available(payload)
+            
             missing_fields = []
 
             if map_id in (None, ""):
@@ -246,7 +254,9 @@ class BestPath(Resource):
                 transports_available=transports_available,
                 element_to_optimize=element_to_optimize,
                 algorithm_to_use=algorithm_to_use,
-                beam_width=beam_width
+                beam_width=beam_width,
+                top_k=top_k,
+                max_walk_min=max_walk_min
             )
 
             if result.get("success"):
