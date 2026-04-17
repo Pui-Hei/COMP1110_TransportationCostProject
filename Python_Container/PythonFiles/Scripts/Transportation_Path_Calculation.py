@@ -382,6 +382,33 @@ def _heuristic_minutes(node_id, end_node_id, landmark_lookup, transports_availab
     return (distance_km / max_speed) * 60
 
 
+def _heuristic_objective_lower_bound(
+    node_id,
+    end_node_id,
+    optimization,
+    transports_available,
+    landmark_lookup
+):
+    if node_id == end_node_id:
+        return 0.0
+
+    if optimization == "fastest":
+        return _heuristic_minutes(node_id, end_node_id, landmark_lookup, transports_available)
+
+    # For cheapest and least_transfer, a conservative admissible lower bound is 0.
+    return 0.0
+
+
+def _astar_priority(state, end_node_id, optimization, transports_available, landmark_lookup):
+    return state["objective_score"] + _heuristic_objective_lower_bound(
+        state["node_id"],
+        end_node_id,
+        optimization,
+        transports_available,
+        landmark_lookup
+    )
+
+
 def _run_dijkstra(
     graph,
     start_node_id,
@@ -431,6 +458,76 @@ def _run_dijkstra(
                 heapq.heappush(
                     pq,
                     (next_state["objective_score"], state_counter, next_state)
+                )
+
+    return None
+
+
+def _run_astar(
+    graph,
+    start_node_id,
+    end_node_id,
+    optimization,
+    transports_available,
+    landmark_lookup,
+    bus_price_lookup,
+    train_fee_lookup
+):
+    start_state = _make_initial_state(start_node_id)
+    start_state["objective_score"] = _score_state(start_state, optimization)
+
+    state_counter = 0
+    pq = [(
+        _astar_priority(start_state, end_node_id, optimization, transports_available, landmark_lookup),
+        start_state["objective_score"],
+        state_counter,
+        start_state
+    )]
+    best_score_by_signature = {_state_signature(start_state): start_state["objective_score"]}
+
+    while pq:
+        _, _, _, state = heapq.heappop(pq)
+        signature = _state_signature(state)
+        best_score = best_score_by_signature.get(signature, float("inf"))
+
+        if state["objective_score"] > best_score + EPSILON:
+            continue
+
+        if state["node_id"] == end_node_id:
+            return state
+
+        for edge in graph[state["node_id"]]:
+            next_state = _advance_state(
+                state,
+                edge,
+                optimization,
+                bus_price_lookup,
+                train_fee_lookup
+            )
+
+            if next_state is None:
+                continue
+
+            next_signature = _state_signature(next_state)
+            next_best_score = best_score_by_signature.get(next_signature, float("inf"))
+
+            if next_state["objective_score"] + EPSILON < next_best_score:
+                best_score_by_signature[next_signature] = next_state["objective_score"]
+                state_counter += 1
+                heapq.heappush(
+                    pq,
+                    (
+                        _astar_priority(
+                            next_state,
+                            end_node_id,
+                            optimization,
+                            transports_available,
+                            landmark_lookup
+                        ),
+                        next_state["objective_score"],
+                        state_counter,
+                        next_state
+                    )
                 )
 
     return None
@@ -572,6 +669,13 @@ def _beam_ranked_paths(
                     _objective_sort_key(st, optimization)
                 )
             )
+        elif strategy == "astar":
+            next_frontier.sort(
+                key=lambda st: (
+                    _astar_priority(st, end_node_id, optimization, transports_available, landmark_lookup),
+                    _objective_sort_key(st, optimization)
+                )
+            )
         else:
             next_frontier.sort(key=lambda st: _objective_sort_key(st, optimization))
 
@@ -665,12 +769,6 @@ def get_best_path(
     algorithm_to_use = _normalize_algorithm(algorithm_to_use)
     beam_width = _normalize_beam_width(beam_width)
 
-    if algorithm_to_use == "astar":
-        return {
-            "success": False,
-            "error": "A* is reserved for teammate integration and is not implemented in this branch yet. Please use 'dijkstra' or 'greedy'."
-        }
-
     # 1. Fetch map data from the database
     map_data = SQL_Data_Retriever.get_map_preview(map_id)
     if not map_data.get("success"):
@@ -708,6 +806,17 @@ def get_best_path(
             bus_price_lookup,
             train_fee_lookup,
             max_walk_min
+        )
+    elif algorithm_to_use == "astar":
+        best_state = _run_astar(
+            graph,
+            start_id,
+            end_id,
+            element_to_optimize,
+            transports_available,
+            landmark_lookup,
+            bus_price_lookup,
+            train_fee_lookup
         )
     elif algorithm_to_use == "greedy":
         best_state = _run_greedy(
