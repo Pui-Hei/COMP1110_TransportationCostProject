@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test CSV Import</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 700px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        p {
+            color: #555;
+            text-align: center;
+        }
+
+        form {
+            display: grid;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        input[type="file"] {
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            background: #0077cc;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        button:hover {
+            background: #005fa3;
+        }
+
+        button:disabled {
+            background: #9bbbd3;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 24px;
+            padding: 16px;
+            border-radius: 8px;
+            background: #f0f3f7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: Consolas, monospace;
+            min-height: 80px;
+        }
+
+        .success {
+            border-left: 6px solid #1f9d55;
+            background: #eefaf3;
+        }
+
+        .error {
+            border-left: 6px solid #d64545;
+            background: #fff1f1;
+        }
+
+        .hint {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+            text-align: left;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 20px;
+                padding: 18px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CSV Import Tester</h1>
+        <p>Upload 4 CSV files and import them into a selected map.</p>
+
+        <form id="csvImportForm">
+            <div class="field">
+                <label for="map_id">Map ID</label>
+                <input type="number" id="map_id" name="map_id" required min="1" placeholder="Enter map ID">
+            </div>
+
+            <div class="field">
+                <label for="map_name">Map Name</label>
+                <input type="text" id="map_name" name="map_name" required placeholder="Enter map name">
+            </div>
+
+            <div class="field">
+                <label for="landmarks">Landmarks CSV</label>
+                <input type="file" id="landmarks" name="landmarks" accept=".csv" required>
+            </div>
+
+            <div class="field">
+                <label for="train_lines">Train Lines CSV</label>
+                <input type="file" id="train_lines" name="train_lines" accept=".csv" required>
+            </div>
+
+            <div class="field">
+                <label for="train_fees">Train Fees CSV</label>
+                <input type="file" id="train_fees" name="train_fees" accept=".csv" required>
+            </div>
+
+            <div class="field">
+                <label for="bus_lines">Bus Lines CSV</label>
+                <input type="file" id="bus_lines" name="bus_lines" accept=".csv" required>
+            </div>
+
+            <button type="submit" id="submitBtn">Import CSV Data</button>
+        </form>
+
+        <div class="hint">
+            Expected endpoint: <strong>/import-map-data</strong>
+        </div>
+
+        <div id="result" class="result">Waiting for request...</div>
+    </div>
+
+    <script>
+        const form = document.getElementById('csvImportForm');
+        const resultBox = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            resultBox.className = 'result';
+            resultBox.textContent = 'Uploading and importing CSV data...';
+            submitBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('map_id', document.getElementById('map_id').value);
+                formData.append('map_name', document.getElementById('map_name').value);
+                formData.append('landmarks', document.getElementById('landmarks').files[0]);
+                formData.append('train_lines', document.getElementById('train_lines').files[0]);
+                formData.append('train_fees', document.getElementById('train_fees').files[0]);
+                formData.append('bus_lines', document.getElementById('bus_lines').files[0]);
+
+                const response = await fetch('/import-map-data', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    resultBox.className = 'result success';
+                    resultBox.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    resultBox.className = 'result error';
+                    resultBox.textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultBox.className = 'result error';
+                resultBox.textContent = JSON.stringify({
+                    success: false,
+                    error: error.message
+                }, null, 2);
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

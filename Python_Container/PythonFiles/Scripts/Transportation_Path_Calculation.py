@@ -471,7 +471,8 @@ def _run_astar(
     transports_available,
     landmark_lookup,
     bus_price_lookup,
-    train_fee_lookup
+    train_fee_lookup,
+    max_walk_min
 ):
     start_state = _make_initial_state(start_node_id)
     start_state["objective_score"] = _score_state(start_state, optimization)
@@ -502,7 +503,8 @@ def _run_astar(
                 edge,
                 optimization,
                 bus_price_lookup,
-                train_fee_lookup
+                train_fee_lookup,
+                max_walk_min
             )
 
             if next_state is None:
@@ -816,7 +818,8 @@ def get_best_path(
             transports_available,
             landmark_lookup,
             bus_price_lookup,
-            train_fee_lookup
+            train_fee_lookup,
+            max_walk_min
         )
     elif algorithm_to_use == "greedy":
         best_state = _run_greedy(
