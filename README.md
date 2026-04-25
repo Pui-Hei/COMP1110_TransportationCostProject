@@ -7,7 +7,7 @@ This repository contains a containerized transportation cost and route-planning 
 - a Python-based backend API for data import, queries, and path calculation
 
 ## Technology Stack
-- Language: Python 3.x for backend code and HTML/CSS/JavaScript for frontend pages.
+- Language: Python 3.9 for backend code and HTML/CSS/JavaScript for frontend pages.
 - Execution environment: Docker containers orchestrated via Docker Compose.
 - Runtime services:
   - MySQL database in `MySQL_Container`
@@ -92,7 +92,7 @@ This repository contains a containerized transportation cost and route-planning 
   - Use the provided HTML pages to upload CSV map data, query routes, and preview maps.
 - CLI via Python container:
   - Run the local command line client inside the Python service with:
-    - `docker-compose exec api python PythonFiles/Scripts/local.py`
+    - `python Scripts/local.py`
   - This starts the local CLI tool for loading CSV maps, viewing stored maps, listing landmarks, and querying journeys.
 
 
