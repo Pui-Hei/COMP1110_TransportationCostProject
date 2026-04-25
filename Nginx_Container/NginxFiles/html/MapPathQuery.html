@@ -123,6 +123,12 @@
                     </div>
                 </div>
 
+                <!-- Landmark Search -->
+                <div class="control-card">
+                    <span class="control-label">Search Landmark</span>
+                    <input type="text" id="landmarkSearchInput" class="search-input" placeholder="Type name to highlight on map...">
+                </div>
+
                 <div class="selection-mode-group">
                     <button id="pickStartBtn" class="mode-button active">Pick Start</button>
                     <button id="pickEndBtn" class="mode-button">Pick End</button>
@@ -166,21 +172,21 @@
                     <div class="control-card">
                         <span class="control-label">Beam Width</span>
                         <div class="choice-list">
-                            <input type="number" id="beamWidthInput" value="5" min="1" max="100" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box;">
+                            <input type="number" id="beamWidthInput" value="5" min="1" max="100" class="number-input">
                         </div>
                     </div>
                     <!-- Top K Input -->
                     <div class="control-card">
                         <span class="control-label">Top K (Number of Paths)</span>
                         <div class="choice-list">
-                            <input type="number" id="topKInput" value="3" min="1" max="50" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box;">
+                            <input type="number" id="topKInput" value="3" min="1" max="50" class="number-input">
                         </div>
                     </div>
                     <!-- Max Walk Time Input -->
                     <div class="control-card">
                         <span class="control-label">Max Walk Time (min)</span>
                         <div class="choice-list">
-                            <input type="number" id="maxWalkTimeInput" value="15" min="0" max="1440" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box;">
+                            <input type="number" id="maxWalkTimeInput" value="15" min="0" max="1440" class="number-input">
                         </div>
                     </div>
                 </div>

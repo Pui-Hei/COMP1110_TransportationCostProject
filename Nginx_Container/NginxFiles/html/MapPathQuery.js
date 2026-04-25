@@ -5,25 +5,12 @@ const BEST_PATH_ENDPOINT = `${API_BASE_URL}/best-path`;
 const DEFAULT_CENTER = [22.24, 114.05];
 const DEFAULT_ZOOM = 10;
 
-// Updated to highly distinguishable, vibrant color palettes
 const BUS_ROUTE_COLORS = [
-    "#2563eb", // Blue
-    "#9333ea", // Purple
-    "#059669", // Emerald
-    "#ea580c", // Orange
-    "#db2777", // Pink
-    "#0d9488", // Teal
-    "#4f46e5"  // Indigo
+    "#2563eb", "#9333ea", "#059669", "#ea580c", "#db2777", "#0d9488", "#4f46e5"
 ];
 
 const TRAIN_ROUTE_COLORS = [
-    "#dc2626", // Red
-    "#c026d3", // Fuchsia
-    "#0284c7", // Light Blue
-    "#65a30d", // Lime
-    "#f59e0b", // Amber
-    "#be123c", // Rose Dark
-    "#b45309"  // Brown/Bronze
+    "#dc2626", "#c026d3", "#0284c7", "#65a30d", "#f59e0b", "#be123c", "#b45309"
 ];
 
 const LANDMARK_TYPE_COLORS = {
@@ -42,7 +29,7 @@ const state = {
     landmarkLayer: null,
     busLayer: null,
     trainLayer: null,
-    pathLayer: null, // New layer for the best path
+    pathLayer: null,
     activeMapId: null,
     activeMapName: "",
     renderedLandmarkMarkers: [],
@@ -51,9 +38,9 @@ const state = {
     endSelection: null,
     submittingQuery: false,
     latestRequestId: 0,
-    // State for multiple paths
     calculatedPaths: [],
-    selectedPathIndex: 0
+    selectedPathIndex: 0,
+    searchQuery: "" // NEW: Track the search query
 };
 
 const elements = {
@@ -68,6 +55,7 @@ const elements = {
     mapEmptyState: null,
     queryMap: null,
     selectionHint: null,
+    landmarkSearchInput: null, // NEW: Search input
     pickStartBtn: null,
     pickEndBtn: null,
     startLandmarkDisplay: null,
@@ -75,10 +63,9 @@ const elements = {
     computePathBtn: null,
     queryResultStatus: null,
     queryResultOutput: null,
-    // Elements for Beam Search & Path Results
     beamWidthInput: null,
     topKInput: null,
-    maxWalkTimeInput: null, // NEW: Max Walk Time Input
+    maxWalkTimeInput: null,
     pathResultsContainer: null,
     pathSummariesList: null
 };
@@ -125,6 +112,7 @@ function cacheElements() {
     elements.mapEmptyState = document.getElementById("mapEmptyState");
     elements.queryMap = document.getElementById("queryMap");
     elements.selectionHint = document.getElementById("selectionHint");
+    elements.landmarkSearchInput = document.getElementById("landmarkSearchInput"); // NEW
     elements.pickStartBtn = document.getElementById("pickStartBtn");
     elements.pickEndBtn = document.getElementById("pickEndBtn");
     elements.startLandmarkDisplay = document.getElementById("startLandmarkDisplay");
@@ -132,11 +120,9 @@ function cacheElements() {
     elements.computePathBtn = document.getElementById("computePathBtn");
     elements.queryResultStatus = document.getElementById("queryResultStatus");
     elements.queryResultOutput = document.getElementById("queryResultOutput");
-    
-    // Cache new elements
     elements.beamWidthInput = document.getElementById("beamWidthInput");
     elements.topKInput = document.getElementById("topKInput");
-    elements.maxWalkTimeInput = document.getElementById("maxWalkTimeInput"); // NEW
+    elements.maxWalkTimeInput = document.getElementById("maxWalkTimeInput");
     elements.pathResultsContainer = document.getElementById("pathResultsContainer");
     elements.pathSummariesList = document.getElementById("pathSummariesList");
 }
@@ -144,6 +130,12 @@ function cacheElements() {
 function bindEvents() {
     elements.backButton.addEventListener("click", () => {
         window.location.href = "MapPreviewer.html";
+    });
+
+    // NEW: Search input listener
+    elements.landmarkSearchInput.addEventListener("input", (e) => {
+        state.searchQuery = e.target.value.trim().toLowerCase();
+        updateLandmarkSelectionStyles();
     });
 
     elements.pickStartBtn.addEventListener("click", () => {
@@ -171,14 +163,12 @@ function initLeaflet() {
     state.leafletMap = L.map("queryMap", {
         attributionControl: false,
         zoomControl: true,
-        // Set preferCanvas to false so we can use CSS animations on SVG paths
         preferCanvas: false, 
         zoomSnap: 0.25
     });
 
     state.leafletMap.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-    // Create a custom pane for the path to float above static lines but below markers
     state.leafletMap.createPane('pathPane');
     state.leafletMap.getPane('pathPane').style.zIndex = 550;
 
@@ -330,7 +320,6 @@ function renderBusLines(busLines, boundsPoints) {
 
         const color = BUS_ROUTE_COLORS[index % BUS_ROUTE_COLORS.length];
 
-        // Draw white outline background to make the line pop against map tiles
         L.polyline(latLngs, {
             color: '#ffffff',
             weight: 7,
@@ -339,11 +328,10 @@ function renderBusLines(busLines, boundsPoints) {
             lineJoin: "round"
         }).addTo(state.busLayer);
 
-        // Draw main colored line
         const polyline = L.polyline(latLngs, {
             color,
             weight: 4,
-            opacity: 1.0, // Increased opacity for better visibility
+            opacity: 1.0,
             lineCap: "round",
             lineJoin: "round"
         });
@@ -380,7 +368,6 @@ function renderTrainLines(trainLines, boundsPoints) {
 
         const color = TRAIN_ROUTE_COLORS[index % TRAIN_ROUTE_COLORS.length];
 
-        // Draw white outline background to make the line pop against map tiles
         L.polyline(latLngs, {
             color: '#ffffff',
             weight: 8,
@@ -389,11 +376,10 @@ function renderTrainLines(trainLines, boundsPoints) {
             lineJoin: "round"
         }).addTo(state.trainLayer);
 
-        // Draw main colored line
         const polyline = L.polyline(latLngs, {
             color,
             weight: 5,
-            opacity: 1.0, // Increased opacity for better visibility
+            opacity: 1.0,
             dashArray: "10 8",
             lineCap: "round",
             lineJoin: "round"
@@ -623,7 +609,20 @@ function updateSingleSelectionDisplay(element, selection, emptyText) {
 
 function updateLandmarkSelectionStyles() {
     state.renderedLandmarkMarkers.forEach(({ key, landmark, marker }) => {
-        marker.setStyle(getLandmarkMarkerStyle(landmark, key));
+        const style = getLandmarkMarkerStyle(landmark, key);
+        marker.setStyle(style);
+
+        // Bring selected and matched search items to the front
+        const isStart = state.startSelection && state.startSelection.key === key;
+        const isEnd = state.endSelection && state.endSelection.key === key;
+        
+        const name = (landmark.landmark_name || "").toLowerCase();
+        const abbr = (landmark.abbreviation || "").toLowerCase();
+        const matchesSearch = state.searchQuery && (name.includes(state.searchQuery) || abbr.includes(state.searchQuery));
+
+        if (isStart || isEnd || matchesSearch) {
+            marker.bringToFront();
+        }
     });
 }
 
@@ -631,13 +630,25 @@ function getLandmarkMarkerStyle(landmark, key) {
     const isStart = state.startSelection && state.startSelection.key === key;
     const isEnd = state.endSelection && state.endSelection.key === key;
 
+    let matchesSearch = true;
+    let hasSearch = false;
+
+    if (state.searchQuery) {
+        hasSearch = true;
+        const query = state.searchQuery;
+        const name = (landmark.landmark_name || "").toLowerCase();
+        const abbr = (landmark.abbreviation || "").toLowerCase();
+        matchesSearch = name.includes(query) || abbr.includes(query);
+    }
+
     if (isStart) {
         return {
             radius: 9,
             color: "#ffffff",
             weight: 3,
             fillColor: START_SELECTION_COLOR,
-            fillOpacity: 1
+            fillOpacity: 1,
+            opacity: 1
         };
     }
 
@@ -647,16 +658,43 @@ function getLandmarkMarkerStyle(landmark, key) {
             color: "#ffffff",
             weight: 3,
             fillColor: END_SELECTION_COLOR,
-            fillOpacity: 1
+            fillOpacity: 1,
+            opacity: 1
         };
     }
 
+    if (hasSearch && !matchesSearch) {
+        // Dim non-matching landmarks
+        return {
+            radius: 4,
+            color: "#ffffff",
+            weight: 1,
+            fillColor: getLandmarkColor(landmark.type),
+            fillOpacity: 0.2,
+            opacity: 0.2
+        };
+    }
+
+    if (hasSearch && matchesSearch) {
+        // Highlight matching landmarks
+        return {
+            radius: 10,
+            color: "#fbbf24", // Amber/Yellow highlight border
+            weight: 3,
+            fillColor: getLandmarkColor(landmark.type),
+            fillOpacity: 1,
+            opacity: 1
+        };
+    }
+
+    // Default style
     return {
         radius: 6,
         color: "#ffffff",
         weight: 2,
         fillColor: getLandmarkColor(landmark.type),
-        fillOpacity: 0.95
+        fillOpacity: 0.95,
+        opacity: 1
     };
 }
 
@@ -664,6 +702,8 @@ function clearSelections() {
     state.startSelection = null;
     state.endSelection = null;
     state.selectionMode = "start";
+    state.searchQuery = "";
+    if (elements.landmarkSearchInput) elements.landmarkSearchInput.value = "";
 
     updateSelectionModeUI();
     updateSelectionDisplays();
@@ -671,7 +711,6 @@ function clearSelections() {
     updateQueryControlsState();
     if (state.pathLayer) state.pathLayer.clearLayers();
     
-    // Clear path results when selections are cleared
     elements.pathResultsContainer.classList.add("hidden");
     elements.pathSummariesList.innerHTML = "";
     state.calculatedPaths = [];
@@ -733,7 +772,6 @@ async function submitBestPathQuery() {
         return;
     }
 
-    // Include beam_width, top_k, and max_walk_min in payload
     const payload = {
         map_id: state.activeMapId,
         start_lm: state.startSelection.value,
@@ -768,22 +806,20 @@ async function submitBestPathQuery() {
             let pathsToRender = [];
 
             if (result.data && Array.isArray(result.data.path)) {
-                // 1. Push the primary path first
                 pathsToRender.push({
                     path: result.data.path,
                     total_cost: result.data.summary.total_cost,
                     total_time: result.data.summary.total_time_minutes,
-                    total_transfers: result.data.summary.total_transfers // FIXED: Now pulling actual transfers from API
+                    total_transfers: result.data.summary.total_transfers
                 });
 
-                // 2. Append the alternative paths generated by the beam search
                 if (Array.isArray(result.data.alternative_paths)) {
                     result.data.alternative_paths.forEach(alt => {
                         pathsToRender.push({
                             path: alt.path,
                             total_cost: alt.summary.total_cost,
                             total_time: alt.summary.total_time_minutes,
-                            total_transfers: alt.summary.total_transfers // FIXED: Now pulling actual transfers from API
+                            total_transfers: alt.summary.total_transfers
                         });
                     });
                 }
@@ -812,7 +848,6 @@ async function submitBestPathQuery() {
     }
 }
 
-// Function to render the list of alternative paths
 function renderPathSummaries() {
     elements.pathSummariesList.innerHTML = "";
     
@@ -829,7 +864,6 @@ function renderPathSummaries() {
         
         const cost = pathData.total_cost !== undefined ? `$${pathData.total_cost}` : "N/A";
         const time = pathData.total_time !== undefined ? `${pathData.total_time} min` : "N/A";
-        // FIXED: Use the exact transfer count returned by the API instead of calculating it from steps
         const transfers = pathData.total_transfers !== undefined ? pathData.total_transfers : "N/A";
         const steps = Array.isArray(pathData.path) ? pathData.path.length : 0;
 
@@ -848,11 +882,9 @@ function renderPathSummaries() {
 
         card.addEventListener("click", () => {
             state.selectedPathIndex = index;
-            // Update UI selection
             Array.from(elements.pathSummariesList.children).forEach((c, i) => {
                 c.classList.toggle("selected", i === index);
             });
-            // Draw the selected path
             drawPathOnMap(state.calculatedPaths[index].path);
         });
 
@@ -867,7 +899,6 @@ function drawPathOnMap(pathSegments) {
     const pathBounds = [];
 
     pathSegments.forEach((segment, index) => {
-        // Find the coordinates for the start and end landmarks of this segment
         const startObj = state.renderedLandmarkMarkers.find(m => m.landmark.landmark_name === segment.start_point);
         const endObj = state.renderedLandmarkMarkers.find(m => m.landmark.landmark_name === segment.end_point);
 
@@ -878,15 +909,13 @@ function drawPathOnMap(pathSegments) {
 
         pathBounds.push(startLatLng, endLatLng);
 
-        // Determine line color based on transport method
-        let color = "#16a34a"; // Default to foot (green)
+        let color = "#16a34a";
         const method = (segment.transportation_method || "").toLowerCase();
         
-        if (method.includes("train")) color = "#e11d48"; // Rose
-        else if (method.includes("bus")) color = "#2563eb"; // Blue
-        else if (method.includes("taxi")) color = "#d97706"; // Amber
+        if (method.includes("train")) color = "#e11d48";
+        else if (method.includes("bus")) color = "#2563eb";
+        else if (method.includes("taxi")) color = "#d97706";
 
-        // Draw a thick white background line to create a "glow" and ensure visibility over other map lines
         L.polyline([startLatLng, endLatLng], {
             color: '#ffffff',
             weight: 8,
@@ -896,13 +925,12 @@ function drawPathOnMap(pathSegments) {
             lineJoin: 'round'
         }).addTo(state.pathLayer);
 
-        // Draw the main animated dashed line
         const polyline = L.polyline([startLatLng, endLatLng], {
             color: color,
             weight: 5,
             opacity: 1,
             pane: 'pathPane',
-            className: 'animated-path', // Hooks into the CSS animation
+            className: 'animated-path',
             lineCap: 'round',
             lineJoin: 'round'
         });
@@ -921,7 +949,6 @@ function drawPathOnMap(pathSegments) {
         polyline.addTo(state.pathLayer);
     });
 
-    // Zoom and pan the map to comfortably fit the calculated path
     if (pathBounds.length > 0) {
         state.leafletMap.fitBounds(L.latLngBounds(pathBounds), {
             padding: [50, 50],
@@ -935,7 +962,6 @@ function resetQueryResult() {
     elements.queryResultOutput.textContent = "No path query has been sent yet.";
     if (state.pathLayer) state.pathLayer.clearLayers();
     
-    // Clear path results on reset
     if (elements.pathResultsContainer) {
         elements.pathResultsContainer.classList.add("hidden");
         elements.pathSummariesList.innerHTML = "";
