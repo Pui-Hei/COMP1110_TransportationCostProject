@@ -22,6 +22,9 @@ def read_csv_file(file_obj):
     Accepts a Flask uploaded file or any file-like object.
     Returns a list of dictionaries from the CSV.
     """
+    if not file_obj or not hasattr(file_obj, 'read'):
+        raise ValueError("Invalid file object provided. Expected a file-like object.")
+
     content = file_obj.read()
 
     if isinstance(content, bytes):
@@ -52,14 +55,24 @@ def process_landmarks(rows):
     Convert landmark CSV rows into normalized Python dictionaries.
     """
     processed = []
+    required_keys = {"Landmark_Name", "Type", "Abbreviation", "Latitude", "Longitude"}
 
-    for row in rows:
+    for i, row in enumerate(rows, start=1):
+        if not required_keys.issubset(row.keys()):
+            raise ValueError(f"Landmarks CSV missing required columns at row {i}. Required: {required_keys}")
+        
+        try:
+            latitude = float(row["Latitude"])
+            longitude = float(row["Longitude"])
+        except ValueError:
+            raise ValueError(f"Invalid Latitude or Longitude at row {i} in Landmarks CSV. Must be numeric.")
+
         processed.append({
             "landmark_name": row["Landmark_Name"].strip(),
             "type": row["Type"].strip(),
             "abbreviation": row["Abbreviation"].strip(),
-            "latitude": float(row["Latitude"]),
-            "longitude": float(row["Longitude"])
+            "latitude": latitude,
+            "longitude": longitude
         })
 
     return processed
@@ -74,17 +87,26 @@ def process_train_lines(rows):
     line_codes = []
     seen = set()
     stops = []
+    required_keys = {"Line_ID", "Stop_Order", "Station_Name"}
 
-    for row in rows:
+    for i, row in enumerate(rows, start=1):
+        if not required_keys.issubset(row.keys()):
+            raise ValueError(f"Train Lines CSV missing required columns at row {i}. Required: {required_keys}")
+
         line_code = row["Line_ID"].strip()
 
         if line_code not in seen:
             seen.add(line_code)
             line_codes.append(line_code)
 
+        try:
+            stop_order = int(row["Stop_Order"])
+        except ValueError:
+            raise ValueError(f"Invalid Stop_Order at row {i} in Train Lines CSV. Must be an integer.")
+
         stops.append({
             "line_code": line_code,
-            "stop_order": int(row["Stop_Order"]),
+            "stop_order": stop_order,
             "station_name": row["Station_Name"].strip()
         })
 
@@ -99,13 +121,22 @@ def process_train_fees(rows):
     Convert train fee CSV rows into normalized Python dictionaries.
     """
     processed = []
+    required_keys = {"Line_ID", "From_Station", "To_Station", "Price"}
 
-    for row in rows:
+    for i, row in enumerate(rows, start=1):
+        if not required_keys.issubset(row.keys()):
+            raise ValueError(f"Train Fees CSV missing required columns at row {i}. Required: {required_keys}")
+
+        try:
+            price = float(row["Price"])
+        except ValueError:
+            raise ValueError(f"Invalid Price at row {i} in Train Fees CSV. Must be numeric.")
+
         processed.append({
             "line_code": row["Line_ID"].strip(),
             "from_station": row["From_Station"].strip(),
             "to_station": row["To_Station"].strip(),
-            "price": float(row["Price"])
+            "price": price
         })
 
     return processed
@@ -119,17 +150,26 @@ def process_bus_lines(rows):
     """
     line_prices = {}
     stops = []
+    required_keys = {"Line_ID", "Price", "Stop_Order", "Station_Name"}
 
-    for row in rows:
+    for i, row in enumerate(rows, start=1):
+        if not required_keys.issubset(row.keys()):
+            raise ValueError(f"Bus Lines CSV missing required columns at row {i}. Required: {required_keys}")
+
         line_code = row["Line_ID"].strip()
-        price = float(row["Price"])
+        
+        try:
+            price = float(row["Price"])
+            stop_order = int(row["Stop_Order"])
+        except ValueError:
+            raise ValueError(f"Invalid Price or Stop_Order at row {i} in Bus Lines CSV. Must be numeric.")
 
         if line_code not in line_prices:
             line_prices[line_code] = price
 
         stops.append({
             "line_code": line_code,
-            "stop_order": int(row["Stop_Order"]),
+            "stop_order": stop_order,
             "station_name": row["Station_Name"].strip()
         })
 
