@@ -3,6 +3,9 @@ import io
 import os
 import mysql.connector
 
+MIN_LANDMARKS = 10
+MIN_SEGMENTS = 20
+
 
 def get_db_connection():
     return mysql.connector.connect(
@@ -201,6 +204,37 @@ def process_csv_data(raw_data):
         "train_fees": process_train_fees(raw_data["train_fees"]),
         "bus_lines": process_bus_lines(raw_data["bus_lines"])
     }
+
+
+def _count_segments(stops):
+    line_counts = {}
+
+    for stop in stops:
+        line_code = stop.get("line_code")
+        if not line_code:
+            continue
+        line_counts[line_code] = line_counts.get(line_code, 0) + 1
+
+    return sum(max(0, count - 1) for count in line_counts.values())
+
+
+def validate_network_size(processed_data):
+    landmarks = processed_data.get("landmarks", [])
+    train_stops = processed_data.get("train_lines", {}).get("stops", [])
+    bus_stops = processed_data.get("bus_lines", {}).get("stops", [])
+
+    stop_count = len(landmarks)
+    segment_count = _count_segments(train_stops) + _count_segments(bus_stops)
+
+    if stop_count < MIN_LANDMARKS or segment_count < MIN_SEGMENTS:
+        raise ValueError(
+            "Network too small: requires at least {} stops and {} segments; got {} stops and {} segments.".format(
+                MIN_LANDMARKS,
+                MIN_SEGMENTS,
+                stop_count,
+                segment_count
+            )
+        )
 
 
 # =========================================================
@@ -550,5 +584,7 @@ def insert_map_data(map_id, map_name, train_lines_file, train_fees_file, landmar
     )
 
     processed_data = process_csv_data(raw_data)
+
+    validate_network_size(processed_data)
 
     return insert_processed_map_data(map_id, map_name, processed_data)
