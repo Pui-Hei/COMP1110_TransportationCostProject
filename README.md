@@ -95,4 +95,41 @@ This repository contains a containerized transportation cost and route-planning 
     - `python Scripts/local.py`
   - This starts the local CLI tool for loading CSV maps, viewing stored maps, listing landmarks, and querying journeys.
 
+## CSV Formats
+The importer expects four CSV files. Column names must match exactly and station names must align with the Landmarks file.
+
+- Landmarks CSV (e.g., `DefaultLandmark.csv`)
+  - Columns: `Landmark_Name`, `Type`, `Abbreviation`, `Latitude`, `Longitude`
+
+- Train Lines CSV (e.g., `DefaultTrainLines.csv`)
+  - Columns: `Line_ID`, `Stop_Order`, `Station_Name`
+
+- Train Fees CSV (e.g., `DefaultTrainFees.csv`)
+  - Columns: `Line_ID`, `From_Station`, `To_Station`, `Price`
+
+- Bus Lines CSV (e.g., `DefaultBusLines.csv`)
+  - Columns: `Line_ID`, `Price`, `Stop_Order`, `Station_Name`
+
+Notes:
+- `Stop_Order` should be an integer.
+- `Price`, `Latitude`, and `Longitude` should be numeric.
+- Empty files or header-only files will be rejected.
+
+## Sample Test Cases
+You can use the provided datasets in `Python_Container/PythonFiles/Data/`.
+
+1. Default network (larger network)
+   - Landmarks: `DefaultLandmark.csv`
+   - Train Lines: `DefaultTrainLines.csv`
+   - Train Fees: `DefaultTrainFees.csv`
+   - Bus Lines: `DefaultBusLines.csv`
+   - Example query: map_id=1, start="Egg 3 Train Station", end="Apple 24 Train Station", preference="fastest"
+
+2. Test case network (smaller, controlled)
+   - Landmarks: `TestCaseMap_Landmarks.csv`
+   - Train Lines: `TestCaseMap_TrainLines.csv`
+   - Train Fees: `TestCaseMap_TrainFees.csv`
+   - Bus Lines: `TestCaseMap_BusLines.csv`
+  - Example query: map_id=2, start="Fruit 1 Train Station", end="Happy 5 Train Station", preference="fewest_segments"
+
 

@@ -810,7 +810,8 @@ async function submitBestPathQuery() {
                     path: result.data.path,
                     total_cost: result.data.summary.total_cost,
                     total_time: result.data.summary.total_time_minutes,
-                    total_transfers: result.data.summary.total_transfers
+                    total_transfers: result.data.summary.total_transfers,
+                    total_segments: result.data.summary.total_segments
                 });
 
                 if (Array.isArray(result.data.alternative_paths)) {
@@ -819,7 +820,8 @@ async function submitBestPathQuery() {
                             path: alt.path,
                             total_cost: alt.summary.total_cost,
                             total_time: alt.summary.total_time_minutes,
-                            total_transfers: alt.summary.total_transfers
+                            total_transfers: alt.summary.total_transfers,
+                            total_segments: alt.summary.total_segments
                         });
                     });
                 }
@@ -865,7 +867,9 @@ function renderPathSummaries() {
         const cost = pathData.total_cost !== undefined ? `$${pathData.total_cost}` : "N/A";
         const time = pathData.total_time !== undefined ? `${pathData.total_time} min` : "N/A";
         const transfers = pathData.total_transfers !== undefined ? pathData.total_transfers : "N/A";
-        const steps = Array.isArray(pathData.path) ? pathData.path.length : 0;
+        const segments = pathData.total_segments !== undefined
+            ? pathData.total_segments
+            : (Array.isArray(pathData.path) ? pathData.path.length : 0);
 
         card.innerHTML = `
             <div class="path-card-title">
@@ -876,7 +880,7 @@ function renderPathSummaries() {
                 <span>Cost: ${cost}</span>
                 <span>Time: ${time}</span>
                 <span>Transfers: ${transfers}</span>
-                <span>Steps: ${steps}</span>
+                <span>Segments: ${segments}</span>
             </div>
         `;
 

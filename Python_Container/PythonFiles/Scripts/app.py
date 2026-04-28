@@ -239,6 +239,23 @@ class BestPath(Resource):
                     "error": f"Missing required field(s): {', '.join(missing_fields)}"
                 }, 400
 
+            element_to_optimize = str(element_to_optimize).strip().lower()
+            algorithm_to_use = str(algorithm_to_use).strip().lower()
+
+            if element_to_optimize not in Transportation_Path_Calculation.VALID_OPTIMIZATIONS:
+                allowed = ", ".join(sorted(Transportation_Path_Calculation.VALID_OPTIMIZATIONS))
+                return {
+                    "success": False,
+                    "error": f"element_to_optimize must be one of: {allowed}"
+                }, 400
+
+            if algorithm_to_use not in Transportation_Path_Calculation.VALID_ALGORITHMS:
+                allowed = ", ".join(sorted(Transportation_Path_Calculation.VALID_ALGORITHMS))
+                return {
+                    "success": False,
+                    "error": f"algorithm_to_use must be one of: {allowed}"
+                }, 400
+
             try:
                 map_id = int(map_id)
             except ValueError:

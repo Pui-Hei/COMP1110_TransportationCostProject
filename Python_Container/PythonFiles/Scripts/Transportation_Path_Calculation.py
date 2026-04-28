@@ -12,7 +12,8 @@ VALID_TRANSPORTS = {
 VALID_OPTIMIZATIONS = {
     "cheapest",
     "fastest",
-    "least_transfer"
+    "least_transfer",
+    "fewest_segments"
 }
 
 VALID_ALGORITHMS = {
@@ -96,7 +97,7 @@ def _normalize_optimization(element_to_optimize):
 
     if optimization not in VALID_OPTIMIZATIONS:
         raise ValueError(
-            "element_to_optimize must be one of: cheapest, fastest, least_transfer"
+            "element_to_optimize must be one of: cheapest, fastest, least_transfer, fewest_segments"
         )
 
     return optimization
@@ -246,6 +247,7 @@ def _make_initial_state(start_node_id):
         "total_time": 0.0,
         "total_cost": 0.0,
         "total_transfers": 0,
+        "total_segments": 0,
         "foot_minutes": 0.0,
         "last_transport": None,
         "last_line": None,
@@ -302,6 +304,8 @@ def _score_state(state, optimization):
         return state["total_cost"]
     if optimization == "least_transfer":
         return float(state["total_transfers"])
+    if optimization == "fewest_segments":
+        return float(state["total_segments"])
     return float("inf")
 
 
@@ -357,6 +361,7 @@ def _advance_state(state, edge, optimization, bus_price_lookup, train_fee_lookup
         "total_time": state["total_time"] + edge["time_min"],
         "total_cost": state["total_cost"] + edge_cost,
         "total_transfers": state["total_transfers"] + transfer_delta,
+        "total_segments": state["total_segments"] + 1,
         "foot_minutes": next_foot_minutes,
         "last_transport": edge["transport"],
         "last_line": edge["line_code"],
@@ -598,7 +603,9 @@ def _objective_sort_key(state, optimization):
         return state["total_time"]
     if optimization == "cheapest":
         return state["total_cost"]
-    return float(state["total_transfers"])
+    if optimization == "least_transfer":
+        return float(state["total_transfers"])
+    return float(state["total_segments"])
 
 
 def _beam_ranked_paths(
@@ -718,6 +725,7 @@ def _state_summary(state):
         "total_cost": round(state["total_cost"], 2),
         "total_time_minutes": round(state["total_time"], 2),
         "total_transfers": max(0, int(state["total_transfers"])),
+        "total_segments": max(0, int(state["total_segments"])),
         "foot_minutes_used": round(state["foot_minutes"], 2)
     }
 

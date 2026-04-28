@@ -30,8 +30,14 @@ def read_csv_file(file_obj):
     if isinstance(content, bytes):
         content = content.decode("utf-8-sig")
 
+    if not str(content).strip():
+        raise ValueError("CSV file is empty.")
+
     reader = csv.DictReader(io.StringIO(content))
-    return list(reader)
+    rows = list(reader)
+    if not rows:
+        raise ValueError("CSV file has no data rows.")
+    return rows
 
 
 def read_all_csv_files(train_lines_file, train_fees_file, landmarks_file, bus_lines_file):

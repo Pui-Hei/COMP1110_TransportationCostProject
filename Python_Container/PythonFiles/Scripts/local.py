@@ -22,7 +22,11 @@ def load_networks():
         if not map_id_str:
             print("Error: Map ID is required.")
             return
-        map_id = int(map_id_str)
+        try:
+            map_id = int(map_id_str)
+        except ValueError:
+            print("Error: Map ID must be a valid integer.")
+            return
         
         map_name = input("Enter Map Name: ").strip()
         if not map_name:
@@ -65,8 +69,8 @@ def load_networks():
         else:
             print(f"\nFailed to load network: {result.get('error')}")
 
-    except ValueError:
-        print("Error: Map ID must be a valid integer.")
+    except ValueError as e:
+        print(f"Error: {e}")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
@@ -109,18 +113,45 @@ def list_all_stops():
 def query_journeys():
     print("\n--- Query Journeys ---")
     try:
-        map_id = int(input("Enter Map ID: ").strip())
+        map_id_str = input("Enter Map ID: ").strip()
+        if not map_id_str:
+            print("Error: Map ID is required.")
+            return
+        try:
+            map_id = int(map_id_str)
+        except ValueError:
+            print("Error: Map ID must be a valid integer.")
+            return
         start_lm = input("Enter Start Landmark (Name or ID): ").strip()
         end_lm = input("Enter End Landmark (Name or ID): ").strip()
         
         transports_input = input("Enter available transports (comma-separated, e.g., train,bus,foot): ").strip()
         transports_available = [t.strip().lower() for t in transports_input.split(",") if t.strip()]
         
-        element_to_optimize = input("Optimize by (cheapest/fastest/least_transfer) [default: fastest]: ").strip().lower() or "fastest"
+        element_to_optimize = input(
+            "Optimize by (cheapest/fastest/least_transfer/fewest_segments) [default: fastest]: "
+        ).strip().lower() or "fastest"
         algorithm_to_use = input("Algorithm (astar/greedy/dijkstra) [default: astar]: ").strip().lower() or "astar"
         
         max_walk_input = input("Max walk minutes [default: 15.0]: ").strip()
-        max_walk_min = float(max_walk_input) if max_walk_input else 15.0
+        if max_walk_input:
+            try:
+                max_walk_min = float(max_walk_input)
+            except ValueError:
+                print("Error: Max walk minutes must be a number.")
+                return
+        else:
+            max_walk_min = 15.0
+
+        top_k_input = input("Number of journeys to show [default: 3]: ").strip()
+        if top_k_input:
+            try:
+                top_k = int(top_k_input)
+            except ValueError:
+                print("Error: Number of journeys must be a valid integer.")
+                return
+        else:
+            top_k = None
 
         print("\nCalculating best path...")
         result = Transportation_Path_Calculation.get_best_path(
@@ -130,29 +161,41 @@ def query_journeys():
             transports_available=transports_available,
             element_to_optimize=element_to_optimize,
             algorithm_to_use=algorithm_to_use,
-            max_walk_min=max_walk_min
+            max_walk_min=max_walk_min,
+            top_k=top_k
         )
 
         if result.get("success"):
             data = result.get("data", {})
-            print("\n=== JOURNEY RESULT ===")
+            print("\n=== JOURNEY RESULTS ===")
             print(f"From: {data.get('start_lm')} -> To: {data.get('end_lm')}")
-            
-            summary = data.get("summary", {})
-            print(f"Total Time: {summary.get('total_time_minutes')} mins")
-            print(f"Total Cost: ${summary.get('total_cost')}")
-            print(f"Transfers: {summary.get('total_transfers')}")
-            print(f"Walking time used: {summary.get('foot_minutes_used')} mins")
-            
-            print("\n--- Route ---")
-            path = data.get("path", [])
-            for i, step in enumerate(path, 1):
-                print(f"{i}. {step['start_point']} to {step['end_point']} via {step['transportation_method']} ({step['time_minutes']} mins)")
+
+            def print_journey(rank, path, summary):
+                print(f"\nRank {rank}")
+                print(f"Total Time: {summary.get('total_time_minutes')} mins")
+                print(f"Total Cost: ${summary.get('total_cost')}")
+                print(f"Segments: {summary.get('total_segments')}")
+                print(f"Transfers: {summary.get('total_transfers')}")
+                print(f"Walking time used: {summary.get('foot_minutes_used')} mins")
+                print("Route:")
+                for i, step in enumerate(path, 1):
+                    print(
+                        f"{i}. {step['start_point']} to {step['end_point']} "
+                        f"via {step['transportation_method']} ({step['time_minutes']} mins)"
+                    )
+
+            primary_summary = data.get("summary", {})
+            primary_path = data.get("path", [])
+            print_journey(1, primary_path, primary_summary)
+
+            alternatives = data.get("alternative_paths", [])
+            for alt in alternatives:
+                print_journey(alt.get("rank", "?"), alt.get("path", []), alt.get("summary", {}))
         else:
             print(f"\nError calculating journey: {result.get('error')}")
 
-    except ValueError:
-        print("Error: Invalid numeric input provided.")
+    except ValueError as e:
+        print(f"Error: {e}")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
