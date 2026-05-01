@@ -115,21 +115,73 @@ Notes:
 - `Price`, `Latitude`, and `Longitude` should be numeric.
 - Empty files or header-only files will be rejected.
 
+
 ## Sample Test Cases
-You can use the provided datasets in `Python_Container/PythonFiles/Data/`.
 
-1. Default network (larger network)
-   - Landmarks: `DefaultLandmark.csv`
-   - Train Lines: `DefaultTrainLines.csv`
-   - Train Fees: `DefaultTrainFees.csv`
-   - Bus Lines: `DefaultBusLines.csv`
-   - Example query: map_id=1, start="Egg 3 Train Station", end="Apple 24 Train Station", preference="fastest"
+These test cases evaluate the multimodal route planning system's performance across various algorithms and constraints.
 
-2. Test case network (smaller, controlled)
-   - Landmarks: `TestCaseMap_Landmarks.csv`
-   - Train Lines: `TestCaseMap_TrainLines.csv`
-   - Train Fees: `TestCaseMap_TrainFees.csv`
-   - Bus Lines: `TestCaseMap_BusLines.csv`
-  - Example query: map_id=2, start="Fruit 1 Train Station", end="Happy 5 Train Station", preference="fewest_segments"
+---
 
+### Dataset Information
 
+To run these test cases, load the correct map: UserScenario. Use the following data files in `Python_Container/PythonFiles/Data/`.:
+*   Landmarks: UserScenario_Landmarks.csv
+*   Train Lines: UserScenario_TrainLines.csv
+*   Train Fees: UserScenario_TrainFees.csv
+*   Bus Lines: UserScenario_BusLines.csv
+
+---
+
+### Test Scenarios
+
+#### 1. Fastest Route and Algorithm Comparison
+Scenario: Peter is in a hurry and needs the quickest path from Dog 50 Recreation Park to Egg 19 Train Station.
+
+*   Execution 1 (Greedy):
+    *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Checked), On Foot (Checked)
+    *   Optimization: Fastest
+    *   Algorithm: Greedy
+    *   Beam Width: 15 | Top K: 5 | Max Walk Time: 15 min
+    *   Result: Identified multiple routes; the best path found was 56.56 min.
+*   Execution 2 (Dijkstra):
+    *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Checked), On Foot (Checked)
+    *   Optimization: Fastest
+    *   Algorithm: Dijkstra
+    *   Beam Width: 2 | Top K: 5 | Max Walk Time: 15 min
+    *   Result: Found the mathematically optimal path of 40.61 min.
+
+#### 2. Constraint Testing (Walking and Transport Modes)
+Scenario: Peter wants the Cheapest route from Grape 54 Train Station to Dog 41 Bus Station without using a taxi.
+
+*   Execution 1 (Strict Walk):
+    *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Unchecked), On Foot (Checked)
+    *   Optimization: Cheapest
+    *   Algorithm: A Star
+    *   Beam Width: 5 | Top K: 5 | Max Walk Time: 5 min
+    *   Result: Failed. No valid path found due to restricted walking time.
+*   Execution 2 (Relaxed Walk):
+    *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Unchecked), On Foot (Checked)
+    *   Optimization: Cheapest
+    *   Algorithm: A Star
+    *   Beam Width: 5 | Top K: 5 | Max Walk Time: 30 min
+    *   Result: Success. Found a path costing $20.51 with a travel time of 67.85 min.
+
+#### 3. Optimization for Minimum Transfers
+Scenario: Peter travels from Dog 22 Residential Building to Apple 2 Shopping Mall and wants to avoid changing vehicles.
+
+*   Execution 1 (With Taxi):
+    *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Checked), On Foot (Checked)
+    *   Optimization: Least Transfer
+    *   Algorithm: Dijkstra
+    *   Beam Width: 50 | Top K: 3 | Max Walk Time: 60 min
+    *   Result: Returns a direct taxi-only route with 0 transfers.
+*   Execution 2 (Public Transport Only):
+    *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Unchecked), On Foot (Checked)
+    *   Optimization: Least Transfer
+    *   Algorithm: Dijkstra
+    *   Beam Width: 50 | Top K: 3 | Max Walk Time: 60 min
+    *   Result: Generates a multimodal route with 3 transfers and 16 steps.
+
+---
+
+> Note: Results may vary for non-deterministic algorithms, such as the Greedy algorithm, which does not guarantee the same globally optimal solution in every execution.
