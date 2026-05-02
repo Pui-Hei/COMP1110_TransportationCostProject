@@ -91,9 +91,22 @@ This repository contains a containerized transportation cost and route-planning 
   - Open a browser and navigate to `http://localhost/`.
   - Use the provided HTML pages to upload CSV map data, query routes, and preview maps.
 - CLI via Python container:
-  - Run the local command line client inside the Python service with:
+  - First start services from the project root:
+    - `docker-compose up --build`
+  - In a second terminal, run the local command line client inside the Python service:
+    - `docker-compose exec api python Scripts/local.py`
+  - Alternative (using the container name from `docker-compose.yml`):
+    - `docker exec -it python_flask_api bash`
     - `python Scripts/local.py`
   - This starts the local CLI tool for loading CSV maps, viewing stored maps, listing landmarks, and querying journeys.
+
+### CLI Guide for Instructor Testing
+
+The command-line interface in `Python_Container/PythonFiles/Scripts/local.py` is intended for interactive testing of the same backend features that are exposed in the GUI. After starting the containers, the instructor can enter the Python service and launch the CLI with either `docker-compose exec api python Scripts/local.py` or `docker exec -it python_flask_api bash` followed by `python Scripts/local.py`.
+
+Inside the CLI, the menu provides four main actions. Option 1 imports map data from CSV files into the database. Option 2 lists the loaded networks so the tester can confirm the available map IDs. Option 3 displays all landmarks for a selected map, which is useful for checking whether the imported network was built correctly. Option 4 opens the journey query flow, where the tester can provide a map ID, origin, destination, available transport modes, optimization mode, algorithm choice, walking limit, beam width, and number of results to display. This makes it possible to test both the general routing flow and specific preferences such as `fastest`, `cheapest`, `least_transfer`, and `fewest_segments` from the terminal without using the browser interface.
+
+For a quick instructor workflow, the recommended sequence is to start the stack with `docker-compose up --build`, import one of the provided sample datasets, and then use the journey query option to compare the CLI output with the GUI results. The CLI prints the total time, total cost, number of segments, number of transfers, and walking time used for each returned journey, so it is suitable for verifying both primary and alternative routes.
 
 ## CSV Formats
 The importer expects four CSV files. Column names must match exactly and station names must align with the Landmarks file.

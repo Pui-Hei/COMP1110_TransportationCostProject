@@ -143,6 +143,19 @@ def query_journeys():
         else:
             max_walk_min = 15.0
 
+        beam_width_input = input("Beam width for ranked alternatives [default: 20]: ").strip()
+        if beam_width_input:
+            try:
+                beam_width = int(beam_width_input)
+            except ValueError:
+                print("Error: Beam width must be a valid integer.")
+                return
+            if beam_width <= 0:
+                print("Error: Beam width must be greater than 0.")
+                return
+        else:
+            beam_width = None
+
         top_k_input = input("Number of journeys to show [default: 3]: ").strip()
         if top_k_input:
             try:
@@ -161,6 +174,7 @@ def query_journeys():
             transports_available=transports_available,
             element_to_optimize=element_to_optimize,
             algorithm_to_use=algorithm_to_use,
+            beam_width=beam_width,
             max_walk_min=max_walk_min,
             top_k=top_k
         )
