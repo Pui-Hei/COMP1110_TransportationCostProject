@@ -148,20 +148,20 @@ To run these test cases, load the correct map: UserScenario. Use the following d
 ### Test Scenarios
 
 #### 1. Fastest Route and Algorithm Comparison
-Scenario: Peter is in a hurry and needs the quickest path from Dog 50 Recreation Park to Egg 19 Train Station.
+Scenario: Peter is in a hurry and needs the quickest path from Egg 19 Recreation Park to Dog 39 Train Station.
 
 *   Execution 1 (Greedy):
     *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Checked), On Foot (Checked)
     *   Optimization: Fastest
     *   Algorithm: Greedy
     *   Beam Width: 15 | Top K: 5 | Max Walk Time: 15 min
-    *   Result: Identified multiple routes; the best path found was 56.56 min.
+    *   Result: Identified multiple routes; the best path found was 42.96 min.
 *   Execution 2 (Dijkstra):
     *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Checked), On Foot (Checked)
     *   Optimization: Fastest
     *   Algorithm: Dijkstra
     *   Beam Width: 2 | Top K: 5 | Max Walk Time: 15 min
-    *   Result: Found the mathematically optimal path of 40.61 min.
+    *   Result: Found the mathematically optimal path of 39.85 min.
 
 #### 2. Constraint Testing (Walking and Transport Modes)
 Scenario: Peter wants the Cheapest route from Grape 54 Train Station to Dog 41 Bus Station without using a taxi.
@@ -177,7 +177,7 @@ Scenario: Peter wants the Cheapest route from Grape 54 Train Station to Dog 41 B
     *   Optimization: Cheapest
     *   Algorithm: A Star
     *   Beam Width: 5 | Top K: 5 | Max Walk Time: 30 min
-    *   Result: Success. Found a path costing $20.51 with a travel time of 67.85 min.
+    *   Result: Success. Found a path costing $11.34 with a travel time of 49.4 min.
 
 #### 3. Optimization for Minimum Transfers
 Scenario: Peter travels from Dog 22 Residential Building to Apple 2 Shopping Mall and wants to avoid changing vehicles.
@@ -186,14 +186,14 @@ Scenario: Peter travels from Dog 22 Residential Building to Apple 2 Shopping Mal
     *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Checked), On Foot (Checked)
     *   Optimization: Least Transfer
     *   Algorithm: Dijkstra
-    *   Beam Width: 50 | Top K: 3 | Max Walk Time: 60 min
+    *   Beam Width: 50 | Top K: 5 | Max Walk Time: 60 min
     *   Result: Returns a direct taxi-only route with 0 transfers.
 *   Execution 2 (Public Transport Only):
     *   Transport Modes: Train (Checked), Bus (Checked), Taxi (Unchecked), On Foot (Checked)
     *   Optimization: Least Transfer
     *   Algorithm: Dijkstra
-    *   Beam Width: 50 | Top K: 3 | Max Walk Time: 60 min
-    *   Result: Generates a multimodal route with 3 transfers and 16 steps.
+    *   Beam Width: 50 | Top K: 5 | Max Walk Time: 60 min
+    *   Result: Generates a multimodal route with 3 transfers and 9 steps.
 
 ---
 
